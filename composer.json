@@ -1,13 +1,13 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/livewire-starter-kit",
+    "name": "120-customs/call-joe-web",
     "type": "project",
-    "description": "The official Laravel starter kit for Livewire.",
+    "description": "Call Joe web: an AI companion app by 120 Customs LLC.",
     "keywords": [
         "laravel",
         "framework"
     ],
-    "license": "MIT",
+    "license": "proprietary",
     "require": {
         "php": "^8.4",
         "laravel/framework": "^12.0",

@@ -1,6 +1,8 @@
 # Call Joe (web)
 
-An open-source AI companion web app: talk and text with AI friends ("contacts") who remember you, keep their own schedules, and reach out on their own. It's the web version of the Call Joe desktop app.
+An AI companion web app by 120 Customs LLC: talk and text with AI friends ("contacts") who remember you, keep their own schedules, and reach out on their own. It's the web version of the Call Joe desktop app.
+
+> **Proprietary software.** This code is public so it can be viewed as a sample of the work. It is not open source: no license is granted to use, copy, modify or host it. See [LICENSE](LICENSE).
 
 Built with Laravel 12, Livewire 4 (Volt and Flux), Postgres, Valkey, Reverb, and Vapi for voice. Installable as a PWA.
 
@@ -46,6 +48,10 @@ CI (GitHub Actions) runs Pint, Larastan and the full Pest suite against Postgres
 
 The MVP is built in small phases, each one tested before the next: environment, accounts, realtime (Reverb), plans and gating, contacts and the catalog, relationships and prompts, the LLM gateway, texting, memory, the PWA, voice calls, contacts reaching out (with relationship-based worry when you're away), safety, images and the shared image cache, billing, the admin dashboard, data rights, hardening, and launch on DigitalOcean.
 
-## Contributing
+## Development guidelines
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: see [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how the code is kept tested and tidy. Security issues: see [SECURITY.md](SECURITY.md).
+
+## License
+
+Copyright © 2026 120 Customs LLC. All rights reserved. See [LICENSE](LICENSE).
