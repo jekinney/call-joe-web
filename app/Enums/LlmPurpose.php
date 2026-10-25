@@ -10,6 +10,7 @@ enum LlmPurpose: string
     case Chat = 'chat';
     case Memory = 'memory';
     case Moderation = 'moderation';
+    case Scenes = 'scenes';
     case Voice = 'voice';
 
     public function label(): string
@@ -18,6 +19,7 @@ enum LlmPurpose: string
             self::Chat => 'Texting',
             self::Memory => 'Memory notes',
             self::Moderation => 'Safety checks',
+            self::Scenes => 'Picture scenes',
             self::Voice => 'Voice calls',
         };
     }

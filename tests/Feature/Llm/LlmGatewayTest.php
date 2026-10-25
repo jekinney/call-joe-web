@@ -129,7 +129,7 @@ it('works out cost in millionths of a dollar', function () {
 });
 
 it('labels every purpose', function () {
-    expect(collect(LlmPurpose::cases())->map->label()->all())->toBe(['Texting', 'Memory notes', 'Safety checks', 'Voice calls']);
+    expect(collect(LlmPurpose::cases())->map->label()->all())->toBe(['Texting', 'Memory notes', 'Safety checks', 'Picture scenes', 'Voice calls']);
 });
 
 it('remembers every fake call', function () {

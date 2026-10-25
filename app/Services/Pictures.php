@@ -20,9 +20,10 @@ use Illuminate\Support\Facades\Storage;
  *
  * 1. request(): uses one of the plan's monthly pictures (none left: no picture) and plans the full prompt from the
  *    contact's looks, always adults only (promptFor).
- * 2. generate() (App\Jobs\GenerateImage, in the background): the safety check on the prompt, the provider, then
- *    our own checks on what came back. The picture is re-encoded (dropping all metadata), stored privately, and sent
- *    as the contact's message. A picture that fails or is blocked gives its count back.
+ * 2. generate() (App\Jobs\GenerateImage, in the background): the safety check on the prompt, then the shared cache
+ *    (App\Services\PictureCache: the same contact's same scene, already made for someone), and only then the provider
+ *    and our own checks on what came back. A new picture is re-encoded (dropping all metadata), stored privately,
+ *    added to the cache, and sent as the contact's message. A picture that fails or is blocked gives its count back.
  */
 class Pictures
 {
@@ -41,6 +42,7 @@ class Pictures
         private Entitlements $entitlements,
         private Moderator $moderator,
         private ImageGenerator $generator,
+        private PictureCache $cache,
     ) {}
 
     /**
@@ -98,8 +100,18 @@ class Pictures
         $entry = $request->userContact()->with(['user', 'contact'])->firstOrFail();
         $request->update(['status' => ImageRequest::GENERATING]);
 
+        // Checked for every user (plans differ: Rated R), even when the picture itself comes from the cache.
         if ($this->moderator->checkImagePrompt($entry->user, $request->normalized_prompt)->blocked) {
             $this->settle($request, $entry, ImageRequest::BLOCKED, 'Stopped by the safety check.');
+
+            return;
+        }
+
+        $signature = $this->cache->signature($entry, $request->prompt);
+        $key = $signature !== null ? $this->cache->keyFor($entry->contact, $signature) : null;
+        $request->update(['scene_signature' => $signature, 'cache_key' => $key]);
+        if ($key !== null && ($cached = $this->cache->pick($key, $entry->user))) {
+            $this->send($request, $entry, $cached->image, fromCache: true);
 
             return;
         }
@@ -125,14 +137,22 @@ class Pictures
         }
 
         $image = $this->store($picture);
+        if ($key !== null) {
+            $this->cache->add($key, $entry->contact, $signature, $image);
+        }
+        $request->update(['provider_job_id' => $generated->providerJobId]);
+        $this->send($request, $entry, $image);
+    }
+
+    /** The picture as the contact's message, live on the user's page. */
+    private function send(ImageRequest $request, UserContact $entry, Image $image, bool $fromCache = false): void
+    {
         $message = $entry->messages()->create([
             'sender' => Message::FROM_CONTACT,
             'body' => "📷 Photo: {$request->prompt}",
             'meta' => ['image_id' => $image->id, 'image_request_id' => $request->id],
         ]);
-        $request->update([
-            'status' => ImageRequest::READY, 'image_id' => $image->id, 'message_id' => $message->id, 'provider_job_id' => $generated->providerJobId,
-        ]);
+        $request->update(['status' => ImageRequest::READY, 'from_cache' => $fromCache, 'image_id' => $image->id, 'message_id' => $message->id]);
         ContactMessaged::dispatch($entry->user, $message);
     }
 

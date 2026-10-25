@@ -67,6 +67,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'can:adm
     Volt::route('prompt-preview', 'admin.prompt-preview')->name('prompt-preview');
     Volt::route('models', 'admin.models')->name('models');
     Volt::route('moderation', 'admin.moderation')->name('moderation');
+    Volt::route('pictures', 'admin.pictures')->name('pictures');
 });
 
 require __DIR__.'/auth.php';
