@@ -1,0 +1,10 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 8
+    # config/ is Laravel's stock boilerplate (env() returns mixed there by design), so it isn't analysed.
+    paths:
+        - app
+        - database
+        - routes
