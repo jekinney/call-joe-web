@@ -15,6 +15,15 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // The owner's admin account, made by Database\Seeders\OwnerSeeder. The password lives only in .env.
+    'owner' => [
+        'name' => env('OWNER_NAME'),
+        'email' => env('OWNER_EMAIL'),
+        'password' => env('OWNER_PASSWORD'),
+        'birth_date' => env('OWNER_BIRTH_DATE'),
+        'timezone' => env('OWNER_TIMEZONE', 'America/Chicago'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

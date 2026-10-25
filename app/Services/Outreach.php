@@ -72,6 +72,7 @@ class Outreach
         private Texting $texting,
         private LlmGateway $gateway,
         private Moderator $moderator,
+        private Pictures $pictures,
     ) {}
 
     /** Plans for every contact of everyone who has used the app. Returns how many reach-outs were planned. */
@@ -203,6 +204,14 @@ class Outreach
         }
 
         if ($this->crossesLine($text) || $this->moderator->checkReply($entry->user, $text)->blocked) {
+            $event->update(['status' => OutreachEvent::SKIPPED, 'materialized_at' => now()]);
+
+            return true;
+        }
+
+        // No pictures in reach-outs: one written later for a backlog couldn't keep its original time.
+        [$text] = $this->pictures->extract($text);
+        if ($text === '') {
             $event->update(['status' => OutreachEvent::SKIPPED, 'materialized_at' => now()]);
 
             return true;

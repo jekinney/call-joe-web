@@ -100,6 +100,18 @@ class Entitlements
     }
 
     /**
+     * Gives back $amount reserved with consume() for something that didn't happen (a picture that failed), within
+     * this period and never below zero.
+     */
+    public function release(User $user, Metric $metric, int $amount = 1): void
+    {
+        DB::table('usage_counters')
+            ->where(['user_id' => $user->id, 'metric' => $metric->value, 'period_start' => $this->periodStart($user, $metric)->toDateString()])
+            ->where('count', '>=', $amount)
+            ->decrement('count', $amount, ['updated_at' => now()]);
+    }
+
+    /**
      * Puts a user on a plan (null expiry = until changed), and records who did it and why.
      */
     public function assignPlan(User $user, Plan $plan, ?DateTimeInterface $expiresAt, ?User $by = null, ?string $reason = null): void

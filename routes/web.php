@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DeclineCallController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ImageController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\VapiWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -42,6 +43,7 @@ Route::prefix('app')->name('app.')->middleware(['auth', 'verified', 'adult', 'no
     Volt::route('memory/{contact:slug}', 'app.memory')->name('memory');
     Volt::route('call/{contact:slug}', 'app.call')->name('call');
     Route::post('calls/{call}/decline', DeclineCallController::class)->name('calls.decline');
+    Route::get('images/{image}', ImageController::class)->name('images.show');
 });
 
 // Settings stay reachable before verifying, so a mistyped email can be fixed.

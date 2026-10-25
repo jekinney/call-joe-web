@@ -41,6 +41,7 @@ class Texting
         private LlmGateway $gateway,
         private MemoryWriter $memory,
         private Moderator $moderator,
+        private Pictures $pictures,
     ) {}
 
     /** What a contact says instead of a reply the safety check stopped. */
@@ -120,13 +121,17 @@ class Texting
         }
 
         $reply = $this->moderator->checkReply($user, $answer->text)->blocked ? self::STOPPED_REPLY : $answer->text;
+        [$reply, $photo] = $this->pictures->extract($reply); // a [photo: ...] follows as a picture
 
         $bubbles = [];
-        foreach ($this->bubbles($reply) as $text) {
+        foreach ($reply === '' && $photo ? [] : $this->bubbles($reply) as $text) {
             $bubbles[] = $message = $entry->messages()->create([
                 'conversation_id' => $conversation->id, 'sender' => Message::FROM_CONTACT, 'body' => $text,
             ]);
             ContactMessaged::dispatch($user, $message);
+        }
+        if ($photo) {
+            $this->pictures->request($entry, $photo);
         }
         $conversation->update(['last_message_at' => now()]);
         UpdateMemory::afterQuiet($entry->id);

@@ -45,6 +45,15 @@ return [
         'webhook_secret' => env('VAPI_WEBHOOK_SECRET', ''),
     ],
 
+    // Pictures contacts send (App\Support\Images\TogetherImageClient). FLUX.1 schnell: a few steps, a few seconds.
+    'together' => [
+        'key' => env('TOGETHER_API_KEY', ''),
+        'base_url' => env('TOGETHER_BASE_URL', 'https://api.together.xyz/v1'),
+        'model' => env('TOGETHER_IMAGE_MODEL', 'black-forest-labs/FLUX.1-schnell'),
+        'steps' => (int) env('TOGETHER_IMAGE_STEPS', 4),
+        'timeout' => (int) env('TOGETHER_TIMEOUT', 60),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

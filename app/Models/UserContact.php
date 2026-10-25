@@ -80,6 +80,12 @@ class UserContact extends Model
         return $this->hasMany(Call::class);
     }
 
+    /** @return HasMany<ImageRequest, $this> */
+    public function imageRequests(): HasMany
+    {
+        return $this->hasMany(ImageRequest::class);
+    }
+
     /** @return HasMany<OutreachEvent, $this> */
     public function outreachEvents(): HasMany
     {

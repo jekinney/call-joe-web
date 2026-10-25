@@ -2,8 +2,10 @@
 
 namespace Tests;
 
+use App\Contracts\ImageGenerator;
 use App\Contracts\LlmClient;
 use App\Contracts\VoiceProvider;
+use App\Support\Images\FakeImageGenerator;
 use App\Support\Llm\FakeLlmClient;
 use App\Support\Voice\FakeVoiceProvider;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
@@ -15,6 +17,8 @@ abstract class TestCase extends BaseTestCase
 
     protected FakeVoiceProvider $voice;
 
+    protected FakeImageGenerator $images;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -25,5 +29,7 @@ abstract class TestCase extends BaseTestCase
         $this->app->instance(LlmClient::class, $this->llm);
         $this->voice = new FakeVoiceProvider;
         $this->app->instance(VoiceProvider::class, $this->voice);
+        $this->images = new FakeImageGenerator;
+        $this->app->instance(ImageGenerator::class, $this->images);
     }
 }

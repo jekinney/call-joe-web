@@ -2,6 +2,7 @@
 
 use App\Enums\Metric;
 use App\Models\Contact;
+use App\Models\ImageRequest;
 use App\Models\Message;
 use App\Models\UserContact;
 use App\Services\Entitlements;
@@ -101,6 +102,8 @@ new #[Title('Texts')] class extends Component {
             'left' => $entitlements->remaining($user, Metric::TextMessages),
             // Someone may have been in danger in the last day (App\Services\Moderator): real help stays on screen.
             'crisis' => $this->entry->messages()->where('created_at', '>=', now()->subDay())->whereNotNull('meta->crisis')->exists(),
+            // A picture on its way (App\Services\Pictures); it arrives live, and the page also checks every minute.
+            'sendingPhoto' => $this->entry->imageRequests()->whereIn('status', [ImageRequest::QUEUED, ImageRequest::GENERATING])->exists(),
         ];
     }
 }; ?>
@@ -140,11 +143,18 @@ new #[Title('Texts')] class extends Component {
                 @if ($message->meta['voicemail'] ?? false)
                     <span class="mb-1 text-xs text-zinc-500" data-voicemail>🎙 {{ __('Voicemail') }}</span>
                 @endif
-                <div @class([
-                    'max-w-[80%] whitespace-pre-line rounded-2xl px-3 py-2 text-sm',
-                    'bg-emerald-600 text-white' => $message->fromUser(),
-                    'bg-zinc-100 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100' => ! $message->fromUser(),
-                ])>{{ $message->body }}</div>
+                @if ($message->meta['image_id'] ?? null)
+                    <a href="{{ route('app.images.show', $message->meta['image_id']) }}" target="_blank" data-photo>
+                        <img src="{{ route('app.images.show', $message->meta['image_id']) }}" alt="{{ Str::after($message->body, '📷 Photo: ') }}"
+                            class="max-h-80 max-w-[70%] rounded-2xl object-cover" loading="lazy" />
+                    </a>
+                @else
+                    <div @class([
+                        'max-w-[80%] whitespace-pre-line rounded-2xl px-3 py-2 text-sm',
+                        'bg-emerald-600 text-white' => $message->fromUser(),
+                        'bg-zinc-100 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100' => ! $message->fromUser(),
+                    ])>{{ $message->body }}</div>
+                @endif
                 @if ($message->cameUnasked())
                     <span class="mt-0.5 text-xs text-zinc-500">{{ $message->created_at->setTimezone(auth()->user()->timezone)->format('D g:i A') }}</span>
                 @endif
@@ -157,6 +167,12 @@ new #[Title('Texts')] class extends Component {
         @empty
             <flux:text class="text-center">{{ __('Say hi to :name.', ['name' => $entry->displayName()]) }}</flux:text>
         @endforelse
+
+        @if ($sendingPhoto)
+            <div class="items-start" data-sending-photo>
+                <div class="inline-block animate-pulse rounded-2xl bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-700">📷 {{ __(':name is sending a photo…', ['name' => $entry->displayName()]) }}</div>
+            </div>
+        @endif
 
         @if ($typing)
             <div class="items-start" data-typing>
