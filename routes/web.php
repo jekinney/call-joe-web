@@ -17,13 +17,21 @@ Route::post('webhooks/vapi', VapiWebhookController::class)->name('webhooks.vapi'
 // Shown by the service worker when there's no connection (cached when the app is installed).
 Route::view('offline', 'offline')->name('offline');
 
+// The Terms, Privacy Policy and AI disclosure (accepted at sign-up, and again when they change).
+Route::view('terms', 'legal.terms')->name('legal.terms');
+Route::view('privacy', 'legal.privacy')->name('legal.privacy');
+Route::view('ai', 'legal.ai')->name('legal.ai');
+
 // "Home" after logging in: admins to /admin, everyone else to /app.
 Route::get('home', HomeController::class)
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
-// The phone: signed in, email verified, and an adult.
-Route::prefix('app')->name('app.')->middleware(['auth', 'verified', 'adult'])->group(function () {
+// Accepting updated terms, before going back into the app.
+Volt::route('app/terms', 'app.terms')->middleware(['auth', 'verified', 'adult', 'not-suspended'])->name('terms.accept');
+
+// The phone: signed in, email verified, an adult, not suspended, and the current terms accepted.
+Route::prefix('app')->name('app.')->middleware(['auth', 'verified', 'adult', 'not-suspended', 'terms'])->group(function () {
     Route::view('/', 'app.home')->name('home');
     Route::post('presence', PresenceController::class)->middleware('throttle:10,1')->name('presence');
     Volt::route('plan', 'app.plan')->name('plan');
@@ -56,6 +64,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'can:adm
     Volt::route('contacts/{contact}', 'admin.contacts.edit')->name('contacts.edit');
     Volt::route('prompt-preview', 'admin.prompt-preview')->name('prompt-preview');
     Volt::route('models', 'admin.models')->name('models');
+    Volt::route('moderation', 'admin.moderation')->name('moderation');
 });
 
 require __DIR__.'/auth.php';

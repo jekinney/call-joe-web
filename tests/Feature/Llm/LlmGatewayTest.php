@@ -47,8 +47,8 @@ it('never uses a model that is turned off', function () {
 });
 
 it('explains when no model is set up for a purpose', function () {
-    gateway()->modelFor(LlmPurpose::Moderation);
-})->throws(LlmException::class, 'No active model for Safety checks.');
+    gateway()->modelFor(LlmPurpose::Voice);
+})->throws(LlmException::class, 'No active model for Voice calls.');
 
 it('picks up model changes once they are cleared from the cache', function () {
     $user = User::factory()->create();

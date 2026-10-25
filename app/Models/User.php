@@ -28,6 +28,10 @@ use Illuminate\Support\Str;
  * @property Carbon|null $plan_expires_at
  * @property Carbon|null $away_until away mode: contacts know and don't worry until then
  * @property string|null $away_note e.g. "On vacation in Maine"
+ * @property array<string, mixed>|null $flags strikes (blocked texts), suspension_reason, suspended_by
+ * @property Carbon|null $suspended_at
+ * @property Carbon|null $terms_accepted_at
+ * @property string|null $terms_version which terms they accepted (config/legal.php)
  * @property-read Plan|null $plan
  */
 class User extends Authenticatable implements MustVerifyEmail
@@ -89,6 +93,9 @@ class User extends Authenticatable implements MustVerifyEmail
             'last_seen_at' => 'datetime',
             'plan_expires_at' => 'datetime',
             'away_until' => 'datetime',
+            'flags' => 'array',
+            'suspended_at' => 'datetime',
+            'terms_accepted_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -140,6 +147,38 @@ class User extends Authenticatable implements MustVerifyEmail
     public function preferredName(): string
     {
         return $this->display_name ?: Str::before($this->name, ' ');
+    }
+
+    public function isSuspended(): bool
+    {
+        return $this->suspended_at !== null;
+    }
+
+    /** An admin shuts the account out of /app (App\Http\Middleware\EnsureNotSuspended); contacts stop reaching out. */
+    public function suspend(string $reason, User $by): void
+    {
+        $this->forceFill([
+            'suspended_at' => now(),
+            'flags' => [...($this->flags ?? []), 'suspension_reason' => $reason, 'suspended_by' => $by->id],
+        ])->save();
+    }
+
+    public function unsuspend(): void
+    {
+        $flags = $this->flags ?? [];
+        unset($flags['suspension_reason'], $flags['suspended_by']);
+        $this->forceFill(['suspended_at' => null, 'flags' => $flags ?: null])->save();
+    }
+
+    /** They've accepted the current Terms, Privacy Policy and AI disclosure (config/legal.php). */
+    public function hasAcceptedTerms(): bool
+    {
+        return $this->terms_version === config('legal.terms_version');
+    }
+
+    public function acceptTerms(): void
+    {
+        $this->forceFill(['terms_accepted_at' => now(), 'terms_version' => config('legal.terms_version')])->save();
     }
 
     /** Away mode is on: they told their contacts they're away until a time still ahead. */

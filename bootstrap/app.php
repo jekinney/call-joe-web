@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\EnsureAdult;
 use App\Http\Middleware\EnsureFeature;
+use App\Http\Middleware\EnsureNotSuspended;
+use App\Http\Middleware\EnsureTermsAccepted;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -20,6 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'adult' => EnsureAdult::class,
             'feature' => EnsureFeature::class,
+            'not-suspended' => EnsureNotSuspended::class,
+            'terms' => EnsureTermsAccepted::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

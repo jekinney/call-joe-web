@@ -36,7 +36,7 @@ it('lists the models by purpose with last week\'s usage', function () {
         ->assertSee('Llama 3.3 70B')->assertSee('llama-3.1-8b-instant')
         ->assertSee('If it fails: Llama 3.1 8B (fast)')
         ->assertSee('Last 7 days: 2 calls, 1,000 tokens, $0.0025, 1 errors')
-        ->assertSee('No models yet.'); // Safety checks and Voice calls have none
+        ->assertSee('No models yet.'); // Voice calls has none
 });
 
 it('warns when no Groq key is set', function () {
@@ -49,14 +49,14 @@ it('warns when no Groq key is set', function () {
 
 it('adds a model, and the gateway uses it right away', function () {
     $small = Llm::where('model_id', 'llama-3.1-8b-instant')->first();
-    // No safety-check model yet: that empty answer is now cached, and saving must clear it.
-    expect(fn () => app(LlmGateway::class)->modelFor(LlmPurpose::Moderation))->toThrow(LlmException::class);
+    // No voice model yet: that empty answer is now cached, and saving must clear it.
+    expect(fn () => app(LlmGateway::class)->modelFor(LlmPurpose::Voice))->toThrow(LlmException::class);
 
     modelsPage()
         ->call('create')
-        ->set('model_id', 'llama-guard-4')
-        ->set('label', 'Llama Guard')
-        ->set('purpose', 'moderation')
+        ->set('model_id', 'llama-voice-4')
+        ->set('label', 'Llama Voice')
+        ->set('purpose', 'voice')
         ->set('fallback_id', (string) $small->id)
         ->set('input_cents_per_mtok', '20')
         ->set('output_cents_per_mtok', '20')
@@ -64,9 +64,9 @@ it('adds a model, and the gateway uses it right away', function () {
         ->call('save')
         ->assertHasNoErrors()
         ->assertDispatched('model-saved')
-        ->assertSee('Llama Guard');
+        ->assertSee('Llama Voice');
 
-    expect(app(LlmGateway::class)->modelFor(LlmPurpose::Moderation)->model_id)->toBe('llama-guard-4');
+    expect(app(LlmGateway::class)->modelFor(LlmPurpose::Voice)->model_id)->toBe('llama-voice-4');
 });
 
 it('edits a model, loading its current values', function () {

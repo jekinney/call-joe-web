@@ -16,6 +16,7 @@ function register(array $overrides = [])
         'password_confirmation' => 'password',
         'date_of_birth' => now()->subYears(30)->toDateString(),
         'timezone' => 'America/Chicago',
+        'terms' => true,
     ], $overrides);
 
     $component = Volt::test('auth.register');

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\LlmPurpose;
 use App\Enums\Metric;
+use App\Enums\ModerationCategory;
 use App\Events\ContactMessaged;
 use App\Events\ContactReplyFailed;
 use App\Events\ContactTyping;
@@ -39,18 +40,28 @@ class Texting
         private PromptBuilder $prompts,
         private LlmGateway $gateway,
         private MemoryWriter $memory,
+        private Moderator $moderator,
     ) {}
 
+    /** What a contact says instead of a reply the safety check stopped. */
+    public const STOPPED_REPLY = "I'm not going there. Let's talk about something else.";
+
     /**
-     * Sends the user's text and asks the contact to reply.
+     * Sends the user's text and asks the contact to reply. The safety check comes first: a blocked text isn't sent
+     * (or counted), and a text that suggests someone may be in danger is marked so the reply follows the crisis path.
      *
-     * @throws DomainException when it's empty, too long, or today's texts are used up.
+     * @throws DomainException when it's empty, too long, blocked, or today's texts are used up.
      */
     public function send(User $user, UserContact $entry, string $body): Message
     {
         $body = trim($body);
         if ($body === '' || mb_strlen($body) > self::MAX_LENGTH) {
             throw new DomainException('A text needs 1 to '.self::MAX_LENGTH.' characters.');
+        }
+
+        $verdict = $this->moderator->checkUserText($user, $body);
+        if ($verdict->blocked) {
+            throw new DomainException("That's something no one here will talk about. Nothing involving anyone under 18, ever.");
         }
 
         if (! $this->entitlements->consume($user, Metric::TextMessages)) {
@@ -60,7 +71,10 @@ class Texting
             throw new DomainException("You've used today's {$limit} texts. They reset at {$resets}.");
         }
 
-        $message = $entry->messages()->create(['sender' => Message::FROM_USER, 'body' => $body]);
+        $message = $entry->messages()->create([
+            'sender' => Message::FROM_USER, 'body' => $body, 'meta' => $verdict->isCrisis() ? ['crisis' => $verdict->category?->value] : null,
+        ]);
+        $verdict->event?->about($message);
         $entry->markHeard();
         SendContactReply::dispatch($message->id);
 
@@ -72,7 +86,9 @@ class Texting
      */
     public function retry(Message $message): void
     {
-        $message->update(['meta' => null]);
+        $meta = $message->meta ?? [];
+        unset($meta['reply_failed']);
+        $message->update(['meta' => $meta ?: null]);
         SendContactReply::dispatch($message->id);
     }
 
@@ -93,7 +109,7 @@ class Texting
         try {
             $answer = $this->gateway->chat(LlmPurpose::Chat, $this->messagesFor($conversation, $entry, $trigger), $user, $entry->contact);
         } catch (LlmException) {
-            $trigger->update(['meta' => ['reply_failed' => true]]);
+            $trigger->update(['meta' => [...($trigger->meta ?? []), 'reply_failed' => true]]);
             ContactReplyFailed::dispatch($user, $trigger);
 
             return [];
@@ -103,8 +119,10 @@ class Texting
             $entry->clearRelief(); // the relieved welcome is in this reply
         }
 
+        $reply = $this->moderator->checkReply($user, $answer->text)->blocked ? self::STOPPED_REPLY : $answer->text;
+
         $bubbles = [];
-        foreach ($this->bubbles($answer->text) as $text) {
+        foreach ($this->bubbles($reply) as $text) {
             $bubbles[] = $message = $entry->messages()->create([
                 'conversation_id' => $conversation->id, 'sender' => Message::FROM_CONTACT, 'body' => $text,
             ]);
@@ -150,8 +168,8 @@ class Texting
 
     /**
      * The frozen prompt, then recent texts up to this one in time order (texts written for a backlog keep their
-     * earlier times), as user/assistant turns. After a worried stretch, a note at the end asks for a relieved welcome
-     * (at the end, so the cached prompt stays the same).
+     * earlier times), as user/assistant turns. Notes go at the end, so the cached prompt stays the same: a relieved
+     * welcome after a worried stretch, and the crisis path when the text suggests someone may be in danger.
      *
      * @return list<array{role: string, content: string}>
      */
@@ -159,12 +177,13 @@ class Texting
     {
         $history = $entry->messages()->where('created_at', '<=', $trigger->created_at)->where('id', '!=', $trigger->id)
             ->orderByDesc('created_at')->orderByDesc('id')->limit(self::HISTORY - 1)->get()->reverse()->push($trigger);
-        $relief = $entry->reliefNote();
+        $crisis = ModerationCategory::tryFrom((string) ($trigger->meta['crisis'] ?? ''));
+        $notes = array_filter([$entry->reliefNote(), $crisis ? Moderator::crisisNote($crisis) : null]);
 
         return [
             ['role' => 'system', 'content' => $conversation->prompt_text],
             ...$history->map(fn (Message $m) => ['role' => $m->fromUser() ? 'user' : 'assistant', 'content' => $m->body])->values()->all(),
-            ...($relief ? [['role' => 'system', 'content' => $relief]] : []),
+            ...array_map(fn (string $note) => ['role' => 'system', 'content' => $note], array_values($notes)),
         ];
     }
 }

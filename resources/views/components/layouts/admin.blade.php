@@ -18,6 +18,7 @@
                     <flux:navlist.item icon="home" :href="route('admin.home')" :current="request()->routeIs('admin.home')" wire:navigate>{{ __('Overview') }}</flux:navlist.item>
                     <flux:navlist.item icon="users" :href="route('admin.users.index')" :current="request()->routeIs('admin.users.*')" wire:navigate>{{ __('Users') }}</flux:navlist.item>
                     <flux:navlist.item icon="user-group" :href="route('admin.contacts.index')" :current="request()->routeIs('admin.contacts.*')" wire:navigate>{{ __('Contacts') }}</flux:navlist.item>
+                    <flux:navlist.item icon="shield-check" :href="route('admin.moderation')" :current="request()->routeIs('admin.moderation')" :badge="\App\Models\ModerationEvent::whereNull('reviewed_at')->count() ?: null" wire:navigate>{{ __('Safety') }}</flux:navlist.item>
                     <flux:navlist.item icon="cpu-chip" :href="route('admin.models')" :current="request()->routeIs('admin.models')" wire:navigate>{{ __('AI models') }}</flux:navlist.item>
                     <flux:navlist.item icon="document-text" :href="route('admin.prompt-preview')" :current="request()->routeIs('admin.prompt-preview')" wire:navigate>{{ __('Prompt preview') }}</flux:navlist.item>
                 </flux:navlist.group>

@@ -99,6 +99,8 @@ new #[Title('Texts')] class extends Component {
             // In time order: texts written after the user came back keep the earlier times they were "sent".
             'messages' => $this->entry->messages()->orderByDesc('created_at')->orderByDesc('id')->limit(50)->get()->reverse(),
             'left' => $entitlements->remaining($user, Metric::TextMessages),
+            // Someone may have been in danger in the last day (App\Services\Moderator): real help stays on screen.
+            'crisis' => $this->entry->messages()->where('created_at', '>=', now()->subDay())->whereNotNull('meta->crisis')->exists(),
         ];
     }
 }; ?>
@@ -109,13 +111,25 @@ new #[Title('Texts')] class extends Component {
         <flux:avatar :src="$contact->avatarUrl()" :name="$contact->name" />
         <div>
             <flux:heading>{{ $entry->displayName() }}</flux:heading>
-            <flux:text size="sm">{{ __($entry->relationship?->label ?? 'Friend') }}</flux:text>
+            <flux:text size="sm">{{ __($entry->relationship?->label ?? 'Friend') }} · <a href="{{ route('legal.ai') }}" class="underline" target="_blank">{{ __('AI companion') }}</a></flux:text>
         </div>
         <div class="ml-auto flex gap-1">
             <flux:button size="sm" variant="ghost" icon="phone" :href="route('app.call', $contact)" wire:navigate>{{ __('Call') }}</flux:button>
             <flux:button size="sm" variant="ghost" icon="light-bulb" :href="route('app.memory', $contact)" wire:navigate>{{ __('What they remember') }}</flux:button>
         </div>
     </div>
+
+    @if ($crisis)
+        <flux:callout icon="heart" color="sky" class="mt-3" data-crisis>
+            <flux:callout.heading>{{ __('You matter, and you don\'t have to go through this alone.') }}</flux:callout.heading>
+            <flux:callout.text>
+                {{ __(':name is an AI and can\'t get you help. Real people can, right now, any time:', ['name' => $entry->displayName()]) }}
+                <a href="tel:988" class="font-semibold underline">{{ __('call 988') }}</a> {{ __('or') }}
+                <a href="sms:988" class="font-semibold underline">{{ __('text 988') }}</a> {{ __('(the Suicide & Crisis Lifeline, US).') }}
+                {{ __('If you or someone else is in danger right now, call 911.') }}
+            </flux:callout.text>
+        </flux:callout>
+    @endif
 
     <div class="flex flex-1 flex-col gap-2 overflow-y-auto py-4" id="thread"
         x-data x-init="$el.scrollTop = $el.scrollHeight" x-on:text-sent.window="$nextTick(() => $el.scrollTop = $el.scrollHeight)"

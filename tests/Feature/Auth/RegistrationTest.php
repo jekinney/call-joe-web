@@ -26,6 +26,7 @@ class RegistrationTest extends TestCase
             ->set('password_confirmation', 'password')
             ->set('date_of_birth', now()->subYears(30)->toDateString())
             ->set('timezone', 'America/Chicago')
+            ->set('terms', true)
             ->call('register');
 
         $response

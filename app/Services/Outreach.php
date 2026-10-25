@@ -71,13 +71,14 @@ class Outreach
         private Presence $presence,
         private Texting $texting,
         private LlmGateway $gateway,
+        private Moderator $moderator,
     ) {}
 
     /** Plans for every contact of everyone who has used the app. Returns how many reach-outs were planned. */
     public function planAll(): int
     {
         $planned = 0;
-        UserContact::query()->where('is_active', true)->whereHas('user', fn ($q) => $q->whereNotNull('last_seen_at'))
+        UserContact::query()->where('is_active', true)->whereHas('user', fn ($q) => $q->whereNotNull('last_seen_at')->whereNull('suspended_at'))
             ->with(['user', 'contact', 'relationship'])
             ->chunkById(200, function (Collection $entries) use (&$planned) {
                 foreach ($entries as $entry) {
@@ -201,7 +202,7 @@ class Outreach
             return false;
         }
 
-        if ($this->crossesLine($text)) {
+        if ($this->crossesLine($text) || $this->moderator->checkReply($entry->user, $text)->blocked) {
             $event->update(['status' => OutreachEvent::SKIPPED, 'materialized_at' => now()]);
 
             return true;

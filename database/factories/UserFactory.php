@@ -33,7 +33,30 @@ class UserFactory extends Factory
             'locale' => 'en',
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'terms_accepted_at' => now(),
+            'terms_version' => config('legal.terms_version'),
         ];
+    }
+
+    /**
+     * Someone who hasn't accepted the current terms (signed up before they changed).
+     */
+    public function withOldTerms(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'terms_version' => '2000-01-01',
+        ]);
+    }
+
+    /**
+     * An account an admin has suspended.
+     */
+    public function suspended(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'suspended_at' => now(),
+            'flags' => ['suspension_reason' => 'Testing'],
+        ]);
     }
 
     /**

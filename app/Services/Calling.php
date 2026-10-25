@@ -40,6 +40,7 @@ class Calling
         private PromptBuilder $prompts,
         private MemoryWriter $memory,
         private LlmGateway $gateway,
+        private Moderator $moderator,
     ) {}
 
     /**
@@ -187,10 +188,12 @@ class Calling
 
         $this->useCallTime($entry->user, $seconds);
 
+        // If they talked about hurting themselves, it's noted and the chat shows where to get help.
+        $crisis = $this->moderator->checkCall($entry->user, $call)->isCrisis();
         $entry->messages()->create([
             'sender' => Message::FROM_CONTACT,
             'body' => $seconds > 0 ? '📞 Call · '.$call->lengthLabel() : '📞 Missed call',
-            'meta' => ['call_id' => $call->id],
+            'meta' => ['call_id' => $call->id, ...($crisis ? ['crisis' => 'self_harm'] : [])],
             'read_at' => now(),
         ]);
 

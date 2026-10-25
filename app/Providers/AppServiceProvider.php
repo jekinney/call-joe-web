@@ -5,12 +5,15 @@ namespace App\Providers;
 use App\Contracts\LlmClient;
 use App\Contracts\VoiceProvider;
 use App\Enums\Feature;
+use App\Http\Middleware\EnsureNotSuspended;
+use App\Http\Middleware\EnsureTermsAccepted;
 use App\Models\User;
 use App\Services\Entitlements;
 use App\Support\Llm\GroqClient;
 use App\Support\Voice\VapiClient;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -46,5 +49,8 @@ class AppServiceProvider extends ServiceProvider
 
         // A plan feature, in Blade (@can('feature', App\Enums\Feature::Voicemail)) or code.
         Gate::define('feature', fn (User $user, Feature $feature): bool => app(Entitlements::class)->can($user, $feature));
+
+        // Livewire's own requests (a button on a page) check these too, not only the first page load.
+        Livewire::addPersistentMiddleware([EnsureNotSuspended::class, EnsureTermsAccepted::class]);
     }
 }

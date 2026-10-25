@@ -46,6 +46,23 @@ new #[Layout('components.layouts.admin'), Title('User')] class extends Component
         $this->dispatch('plan-saved');
     }
 
+    public string $suspendReason = '';
+
+    /** Shut the account out of /app (an admin can't suspend themselves). */
+    public function suspend(): void
+    {
+        $this->validate(['suspendReason' => ['required', 'string', 'max:200']]);
+        abort_if($this->user->is(auth()->user()), 422, 'You can\'t suspend yourself.');
+
+        $this->user->suspend($this->suspendReason, auth()->user());
+        $this->suspendReason = '';
+    }
+
+    public function unsuspend(): void
+    {
+        $this->user->unsuspend();
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -87,6 +104,29 @@ new #[Layout('components.layouts.admin'), Title('User')] class extends Component
                 <x-action-message on="plan-saved">{{ __('Saved.') }}</x-action-message>
             </div>
         </form>
+    </section>
+
+    <section class="flex flex-col gap-4" data-safety>
+        <flux:heading size="lg">{{ __('Safety') }}</flux:heading>
+        <flux:text>
+            {{ trans_choice(':count blocked text|:count blocked texts', $user->flags['strikes'] ?? 0, ['count' => $user->flags['strikes'] ?? 0]) }}
+            · <a href="{{ route('admin.moderation', ['user' => $user->id, 'show' => 'all']) }}" class="underline" wire:navigate>{{ __('Safety events') }}</a>
+        </flux:text>
+        @if ($user->isSuspended())
+            <flux:callout icon="no-symbol" color="red" :heading="__('Suspended :date', ['date' => $user->suspended_at->toFormattedDateString()])">
+                @if ($user->flags['suspension_reason'] ?? null)
+                    <flux:callout.text>“{{ $user->flags['suspension_reason'] }}”</flux:callout.text>
+                @endif
+                <x-slot name="actions">
+                    <flux:button size="sm" wire:click="unsuspend">{{ __('Unsuspend') }}</flux:button>
+                </x-slot>
+            </flux:callout>
+        @else
+            <form wire:submit="suspend" class="flex flex-col gap-3">
+                <flux:input wire:model="suspendReason" :label="__('Reason for suspending')" :placeholder="__('What happened')" />
+                <div><flux:button type="submit" variant="danger" wire:confirm="{{ __('Suspend :name? They lose access to the app right away.', ['name' => $user->name]) }}">{{ __('Suspend') }}</flux:button></div>
+            </form>
+        @endif
     </section>
 
     <section class="flex flex-col gap-2">

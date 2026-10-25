@@ -36,6 +36,8 @@ Then open http://localhost:8090.
 
 Contacts keep living while you're away: the scheduler moves each one through their relationship's worry stages and plans texts and calls (`App\Services\Outreach`). Calls ring your open page or become missed calls; texts are written only when you're online to read them, with their original times. Try it with `./vendor/bin/sail artisan outreach:run`.
 
+Safety runs on every text, reply, reach-out, call and (later) picture prompt (`App\Services\Moderator`): fast word patterns, then a small AI classifier only when something looks risky. Anything sexual involving minors is blocked and counted as a strike; talk of self-harm or hurting others puts the contact on a crisis path that points to 988 or 911. Admins review blocked and flagged items and suspend accounts at `/admin/moderation`. The Terms, Privacy Policy and AI disclosure live at `/terms`, `/privacy` and `/ai` (drafts, to be reviewed by counsel); bump `terms_version` in `config/legal.php` to ask everyone to accept a change.
+
 To see real-time delivery, sign in and run `./vendor/bin/sail artisan app:notify you@example.com "Hello"`: the notice pops up on your open page. A page checks in every 45 seconds; the server counts you as online while it does (`App\Services\Presence`).
 
 Ports can be changed in `.env` (`APP_PORT`, `FORWARD_DB_PORT`, `VITE_PORT`, and so on).

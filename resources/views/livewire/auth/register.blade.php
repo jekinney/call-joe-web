@@ -15,6 +15,7 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $password_confirmation = '';
     public string $date_of_birth = '';
     public string $timezone = 'UTC'; // filled in from the browser
+    public bool $terms = false;
 
     /**
      * Handle an incoming registration request.
@@ -27,13 +28,18 @@ new #[Layout('components.layouts.auth')] class extends Component {
             'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
             'date_of_birth' => User::birthDateRules(),
             'timezone' => User::timezoneRules(),
+            'terms' => ['accepted'],
         ], [
             'date_of_birth.before_or_equal' => __('Call Joe is only for adults (18 and over).'),
+            'terms.accepted' => __('Please agree to the Terms and Privacy Policy to continue.'),
         ]);
+        unset($validated['terms']);
 
         $validated['password'] = Hash::make($validated['password']);
 
-        event(new Registered(($user = User::create($validated))));
+        $user = User::create($validated);
+        $user->acceptTerms();
+        event(new Registered($user));
 
         Auth::login($user);
 
@@ -92,6 +98,13 @@ new #[Layout('components.layouts.auth')] class extends Component {
                 autocomplete="new-password"
                 placeholder="Confirm password"
             />
+        </div>
+
+        <!-- The Terms, Privacy Policy and AI disclosure -->
+        <div class="grid gap-2">
+            <flux:checkbox wire:model="terms" id="terms" name="terms" required :label="__('I agree to the Terms and Privacy Policy, and I understand my contacts are AI, not real people.')" />
+            <x-legal-links />
+            <flux:error name="terms" />
         </div>
 
         <div class="flex items-center justify-end">
