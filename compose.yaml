@@ -26,6 +26,39 @@ services:
             - valkey
             - rustfs
             - mailpit
+            - reverb
+    # Real-time: the Reverb WebSocket server. The app talks to it at reverb:8080; browsers at localhost:FORWARD_REVERB_PORT.
+    reverb:
+        image: 'sail-8.5/app'
+        command: ['php', 'artisan', 'reverb:start', '--host=0.0.0.0', '--port=8080']
+        restart: unless-stopped
+        ports:
+            - '${FORWARD_REVERB_PORT:-8091}:8080'
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            - valkey
+    # Background jobs (broadcasts, and later replies, memory and pictures).
+    queue:
+        image: 'sail-8.5/app'
+        command: ['php', 'artisan', 'queue:work', '--tries=3', '--sleep=1']
+        restart: unless-stopped
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            - pgsql
+            - valkey
+            - reverb
     pgsql:
         image: 'postgres:18-alpine'
         ports:

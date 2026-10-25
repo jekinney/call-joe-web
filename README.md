@@ -30,6 +30,10 @@ Then open http://localhost:8090.
 | Valkey | Cache and queues (DigitalOcean Managed Caching in production) | localhost:6379 |
 | RustFS | S3-compatible file storage (DigitalOcean Spaces in production) | http://localhost:9001 (console) |
 | Mailpit | Catches every email the app sends | http://localhost:8025 |
+| Reverb | Real-time WebSockets (texts, rings, notices) | ws://localhost:8091 |
+| Queue | Background jobs and broadcasts | (no port) |
+
+To see real-time delivery, sign in and run `./vendor/bin/sail artisan app:notify you@example.com "Hello"`: the notice pops up on your open page. A page checks in every 45 seconds; the server counts you as online while it does (`App\Services\Presence`).
 
 Ports can be changed in `.env` (`APP_PORT`, `FORWARD_DB_PORT`, `VITE_PORT`, and so on).
 

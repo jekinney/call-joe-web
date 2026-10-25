@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\PresenceController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
@@ -16,6 +17,7 @@ Route::get('home', HomeController::class)
 // The phone: signed in, email verified, and an adult.
 Route::prefix('app')->name('app.')->middleware(['auth', 'verified', 'adult'])->group(function () {
     Route::view('/', 'app.home')->name('home');
+    Route::post('presence', PresenceController::class)->middleware('throttle:10,1')->name('presence');
 });
 
 // Settings stay reachable before verifying, so a mistyped email can be fixed.

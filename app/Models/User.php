@@ -21,6 +21,7 @@ use Illuminate\Support\Str;
  * @property bool $is_admin
  * @property string $timezone
  * @property string $locale
+ * @property Carbon|null $last_seen_at
  */
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -78,6 +79,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'date_of_birth' => 'date',
             'is_admin' => 'boolean',
+            'last_seen_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
