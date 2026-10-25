@@ -102,6 +102,21 @@ class Contact extends Model
         return array_values(array_filter([
             trim($this->persona_md) === '' ? 'a persona' : null,
             $this->avatar_path ? null : 'a picture',
+            $this->voice() ? null : 'a voice',
         ]));
+    }
+
+    /**
+     * The voice they speak with on calls (a Vapi voice provider and that provider's voice id), or null if none yet.
+     *
+     * @return array{provider: string, voiceId: string}|null
+     */
+    public function voice(): ?array
+    {
+        $provider = $this->voice_settings['provider'] ?? null;
+
+        return $this->voice_provider_id && is_string($provider) && $provider !== ''
+            ? ['provider' => $provider, 'voiceId' => $this->voice_provider_id]
+            : null;
     }
 }

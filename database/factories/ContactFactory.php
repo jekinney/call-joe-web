@@ -28,9 +28,14 @@ class ContactFactory extends Factory
         ];
     }
 
+    public function withVoice(): static
+    {
+        return $this->state(fn () => ['voice_provider_id' => 'test-voice', 'voice_settings' => ['provider' => 'vapi']]);
+    }
+
     public function published(): static
     {
-        return $this->state(fn () => [
+        return $this->withVoice()->state(fn () => [
             'avatar_path' => 'contacts/avatar-test.jpg',
         ])->afterCreating(function (Contact $contact) {
             $contact->forceFill(['is_published' => true, 'published_at' => now()])->save();

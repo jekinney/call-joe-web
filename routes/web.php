@@ -2,12 +2,16 @@
 
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PresenceController;
+use App\Http\Controllers\VapiWebhookController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
+
+// Vapi's call reports (checked by a secret header; no session or CSRF token).
+Route::post('webhooks/vapi', VapiWebhookController::class)->name('webhooks.vapi');
 
 // Shown by the service worker when there's no connection (cached when the app is installed).
 Route::view('offline', 'offline')->name('offline');
@@ -27,6 +31,7 @@ Route::prefix('app')->name('app.')->middleware(['auth', 'verified', 'adult'])->g
     Volt::route('contacts', 'app.contacts')->name('contacts');
     Volt::route('chat/{contact:slug}', 'app.chat')->name('chat');
     Volt::route('memory/{contact:slug}', 'app.memory')->name('memory');
+    Volt::route('call/{contact:slug}', 'app.call')->name('call');
 });
 
 // Settings stay reachable before verifying, so a mistyped email can be fixed.

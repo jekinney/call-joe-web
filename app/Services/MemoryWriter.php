@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\LlmPurpose;
 use App\Exceptions\LlmException;
+use App\Models\Call;
 use App\Models\Memory;
 use App\Models\MemoryVersion;
 use App\Models\Message;
@@ -37,7 +38,7 @@ class MemoryWriter
     }
 
     /**
-     * Rewrites the notes from texts newer than the last update. Returns whether they changed.
+     * Rewrites the notes from texts and call transcripts newer than the last update. Returns whether they changed.
      */
     public function update(UserContact $entry): bool
     {
@@ -45,19 +46,23 @@ class MemoryWriter
         $memory = $this->memoryFor($entry);
 
         $new = $entry->messages()->where('id', '>', $memory->last_message_id ?? 0)->orderBy('id')->limit(self::MAX_NEW_MESSAGES)->get();
-        if ($new->isEmpty()) {
+        $calls = $entry->calls()->whereNotNull('transcript')->where('id', '>', $memory->last_call_id ?? 0)->orderBy('id')->get();
+        if ($new->isEmpty() && $calls->isEmpty()) {
             return false;
         }
 
         $buddy = $entry->user->preferredName();
         $contact = $entry->contact->firstName();
-        $transcript = $new->map(fn (Message $m) => ($m->fromUser() ? $buddy : $contact).': '.$m->body)->implode("\n");
+        $transcript = implode("\n\n", array_filter([
+            $new->isEmpty() ? null : "New texts:\n".$new->map(fn (Message $m) => ($m->fromUser() ? $buddy : $contact).': '.$m->body)->implode("\n"),
+            ...$calls->map(fn (Call $call) => 'Phone call on '.$call->created_at?->timezone($entry->user->timezone)->toFormattedDateString().":\n".$call->transcript)->all(),
+        ]));
         $forgotten = $memory->forgotten ? "\n\n{$buddy} asked you to forget these; never write them down again:\n- ".implode("\n- ", $memory->forgotten) : '';
 
         try {
             $answer = $this->gateway->chat(LlmPurpose::Memory, [
                 ['role' => 'system', 'content' => "You keep {$contact}'s private notes about {$buddy}, so {$contact} remembers them next time. Write only what {$buddy} shared or what happened between you: people in their life, work, plans, likes, worries, important dates (as real dates, today is ".now($entry->user->timezone)->toFormattedDateString().'). Keep everything still true from the old notes, update what changed, drop small talk, and never invent anything. Reply with only the notes, as short bullet points starting with "- ", under 350 words.'],
-                ['role' => 'user', 'content' => "Old notes:\n".($memory->notes_md !== '' ? $memory->notes_md : '(none yet)')."\n\nNew texts:\n{$transcript}{$forgotten}"],
+                ['role' => 'user', 'content' => "Old notes:\n".($memory->notes_md !== '' ? $memory->notes_md : '(none yet)')."\n\n{$transcript}{$forgotten}"],
             ], $entry->user, $entry->contact);
         } catch (LlmException $e) {
             Log::warning('Memory update failed; keeping the old notes.', ['user_contact_id' => $entry->id, 'error' => $e->getMessage()]);
@@ -65,7 +70,7 @@ class MemoryWriter
             return false;
         }
 
-        $this->save($memory, $this->clean($answer->text), 'update', (int) $new->last()->id);
+        $this->save($memory, $this->clean($answer->text), 'update', $new->last()->id ?? $memory->last_message_id, $calls->last()->id ?? $memory->last_call_id);
 
         return true;
     }
@@ -83,22 +88,22 @@ class MemoryWriter
 
         $memory->forgotten = [...($memory->forgotten ?? []), $lines[$index]];
         unset($lines[$index]);
-        $this->save($memory, $this->asBullets($lines), 'forget', $memory->last_message_id);
+        $this->save($memory, $this->asBullets($lines), 'forget', $memory->last_message_id, $memory->last_call_id);
     }
 
     /**
-     * Forgets everything: the notes are emptied, and texts so far won't be learned again.
+     * Forgets everything: the notes are emptied, and texts and calls so far won't be learned again.
      */
     public function reset(UserContact $entry): void
     {
         $memory = $this->memoryFor($entry);
-        $this->save($memory, '', 'reset', $entry->messages()->max('id') ?? $memory->last_message_id);
+        $this->save($memory, '', 'reset', $entry->messages()->max('id') ?? $memory->last_message_id, $entry->calls()->max('id') ?? $memory->last_call_id);
     }
 
-    private function save(Memory $memory, string $notes, string $reason, ?int $lastMessageId): void
+    private function save(Memory $memory, string $notes, string $reason, ?int $lastMessageId, ?int $lastCallId): void
     {
-        DB::transaction(function () use ($memory, $notes, $reason, $lastMessageId) {
-            $memory->fill(['notes_md' => $notes, 'last_message_id' => $lastMessageId, 'version' => $memory->version + 1])->save();
+        DB::transaction(function () use ($memory, $notes, $reason, $lastMessageId, $lastCallId) {
+            $memory->fill(['notes_md' => $notes, 'last_message_id' => $lastMessageId, 'last_call_id' => $lastCallId, 'version' => $memory->version + 1])->save();
             MemoryVersion::create(['memory_id' => $memory->id, 'version' => $memory->version, 'notes_md' => $notes, 'reason' => $reason]);
         });
     }

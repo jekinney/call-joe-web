@@ -16,17 +16,18 @@ use Illuminate\Support\Carbon;
  * @property list<string>|null $forgotten
  * @property int $version
  * @property int|null $last_message_id
+ * @property int|null $last_call_id
  * @property Carbon|null $updated_at
  */
 class Memory extends Model
 {
-    protected $fillable = ['user_contact_id', 'notes_md', 'forgotten', 'version', 'last_message_id'];
+    protected $fillable = ['user_contact_id', 'notes_md', 'forgotten', 'version', 'last_message_id', 'last_call_id'];
 
     protected $attributes = ['notes_md' => '', 'version' => 0];
 
     protected function casts(): array
     {
-        return ['forgotten' => 'array', 'version' => 'integer', 'last_message_id' => 'integer'];
+        return ['forgotten' => 'array', 'version' => 'integer', 'last_message_id' => 'integer', 'last_call_id' => 'integer'];
     }
 
     /** @return BelongsTo<UserContact, $this> */

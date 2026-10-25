@@ -109,13 +109,16 @@ it('has no picture address without a picture', function () {
     expect(newContact()->avatarUrl())->toBeNull();
 });
 
-it('publishes only when the contact has a persona and a picture', function () {
+it('publishes only when the contact has a persona, a picture and a voice', function () {
     Storage::fake('public');
     $contact = newContact();
 
-    expect(fn () => catalog()->publish($contact))->toThrow(InvalidArgumentException::class, 'Joe Tucker still needs a picture.');
+    expect(fn () => catalog()->publish($contact))->toThrow(InvalidArgumentException::class, 'Joe Tucker still needs a picture and a voice.');
 
     catalog()->setAvatar($contact, UploadedFile::fake()->image('joe.jpg', 512, 512));
+    expect(fn () => catalog()->publish($contact))->toThrow(InvalidArgumentException::class, 'Joe Tucker still needs a voice.');
+
+    catalog()->update($contact, ['voice_provider_id' => 'voice-123', 'voice_settings' => ['provider' => '11labs']]);
     catalog()->publish($contact);
 
     expect($contact->refresh()->is_published)->toBeTrue()
@@ -124,7 +127,13 @@ it('publishes only when the contact has a persona and a picture', function () {
 });
 
 it('lists everything missing before publishing', function () {
-    expect((new Contact(['persona_md' => '  ']))->missingForPublish())->toBe(['a persona', 'a picture']);
+    expect((new Contact(['persona_md' => '  ']))->missingForPublish())->toBe(['a persona', 'a picture', 'a voice']);
+});
+
+it('has a voice only with both a provider and a voice id', function () {
+    expect((new Contact(['voice_provider_id' => 'abc', 'voice_settings' => ['provider' => '11labs']]))->voice())->toBe(['provider' => '11labs', 'voiceId' => 'abc'])
+        ->and((new Contact(['voice_provider_id' => 'abc']))->voice())->toBeNull()
+        ->and((new Contact(['voice_settings' => ['provider' => '11labs']]))->voice())->toBeNull();
 });
 
 it('hides a contact again, keeping the first publish date', function () {

@@ -35,6 +35,16 @@ return [
         'timeout' => (int) env('GROQ_TIMEOUT', 30),
     ],
 
+    // Voice calls (App\Support\Voice\VapiClient). The webhook URL must be reachable from the internet (in development,
+    // through a tunnel such as ngrok); the secret is sent by Vapi with every report.
+    'vapi' => [
+        'private_key' => env('VAPI_PRIVATE_KEY', ''),
+        'public_key' => env('VAPI_PUBLIC_KEY', ''),
+        'base_url' => env('VAPI_BASE_URL', 'https://api.vapi.ai'),
+        'webhook_url' => env('VAPI_WEBHOOK_URL') ?: rtrim((string) env('APP_URL', 'http://localhost'), '/').'/webhooks/vapi',
+        'webhook_secret' => env('VAPI_WEBHOOK_SECRET', ''),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

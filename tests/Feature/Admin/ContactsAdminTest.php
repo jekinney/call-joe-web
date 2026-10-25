@@ -116,9 +116,9 @@ it('uploads a picture, and rejects ones that are too small', function () {
 it('explains what is missing when publishing too early, then publishes and hides', function () {
     $contact = Contact::factory()->create();
 
-    editor($contact)->call('publish')->assertHasErrors('publish')->assertSee('still needs a picture');
+    editor($contact)->call('publish')->assertHasErrors('publish')->assertSee('still needs a picture and a voice');
 
-    $contact->forceFill(['avatar_path' => 'contacts/x.jpg'])->save();
+    $contact->forceFill(['avatar_path' => 'contacts/x.jpg', 'voice_provider_id' => 'v1', 'voice_settings' => ['provider' => 'vapi']])->save();
     editor($contact)->call('publish')->assertHasNoErrors()->assertSee('Hide from catalog');
     expect($contact->refresh()->is_published)->toBeTrue();
 
@@ -138,6 +138,20 @@ it('restores an earlier version from the history', function () {
         ->assertSee('Restored version 1');
 
     expect($contact->refresh()->version)->toBe(3);
+});
+
+it('sets a contact\'s voice, and needs both the provider and the voice id', function () {
+    $contact = Contact::factory()->create();
+
+    editor($contact)->set('voiceProvider', '11labs')->call('save')->assertHasErrors(['voiceId' => 'required_with']);
+    editor($contact)->set('voiceProvider', 'robot')->set('voiceId', 'x')->call('save')->assertHasErrors(['voiceProvider' => 'in']);
+
+    editor($contact)->set('voiceProvider', '11labs')->set('voiceId', 'voice-123')->call('save')->assertHasNoErrors();
+    expect($contact->refresh()->voice())->toBe(['provider' => '11labs', 'voiceId' => 'voice-123']);
+
+    editor($contact)->assertSet('voiceProvider', '11labs')->assertSet('voiceId', 'voice-123')
+        ->set('voiceProvider', '')->set('voiceId', '')->call('save')->assertHasNoErrors();
+    expect($contact->refresh()->voice())->toBeNull();
 });
 
 it('is linked from the admin sidebar', function () {

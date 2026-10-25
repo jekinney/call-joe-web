@@ -22,6 +22,8 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
     public string $requiredPlanId = '';
     public string $persona_md = '';
     public string $looks = '';
+    public string $voiceProvider = '';
+    public string $voiceId = '';
     public string $note = '';
     public bool $preview = false;
 
@@ -35,6 +37,8 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
             $this->fill($contact->only(['name', 'slug', 'gender', 'persona_md']));
             $this->tagline = $contact->tagline ?? '';
             $this->looks = $contact->looks ?? '';
+            $this->voiceProvider = (string) ($contact->voice_settings['provider'] ?? '');
+            $this->voiceId = (string) $contact->voice_provider_id;
             $this->requiredPlanId = (string) ($contact->required_plan_id ?? '');
         }
     }
@@ -52,6 +56,8 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
             'requiredPlanId' => ['nullable', 'exists:plans,id'],
             'persona_md' => ['required', 'string', 'max:20000'],
             'looks' => ['nullable', 'string', 'max:2000'],
+            'voiceProvider' => ['nullable', 'required_with:voiceId', Rule::in(config('contacts.voice_providers'))],
+            'voiceId' => ['nullable', 'required_with:voiceProvider', 'string', 'max:120'],
             'note' => ['nullable', 'string', 'max:200'],
         ];
     }
@@ -68,6 +74,8 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
             'required_plan_id' => $this->requiredPlanId !== '' ? (int) $this->requiredPlanId : null,
             'persona_md' => $this->persona_md,
             'looks' => $this->looks ?: null,
+            'voice_provider_id' => $this->voiceId !== '' ? $this->voiceId : null,
+            'voice_settings' => $this->voiceProvider !== '' ? ['provider' => $this->voiceProvider] : null,
         ];
 
         if (! $this->contact) {
@@ -193,6 +201,16 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
         </div>
 
         <flux:textarea wire:model="looks" rows="3" :label="__('Looks')" :description="__('What they look like, always with skin tone and hair, so every picture of them matches.')" />
+
+        <div class="grid gap-5 sm:grid-cols-2">
+            <flux:select wire:model="voiceProvider" :label="__('Voice provider')">
+                <flux:select.option value="">{{ __('None yet') }}</flux:select.option>
+                @foreach (config('contacts.voice_providers') as $provider)
+                    <flux:select.option :value="$provider">{{ $provider }}</flux:select.option>
+                @endforeach
+            </flux:select>
+            <flux:input wire:model="voiceId" :label="__('Voice id')" :description="__('Only voices you have the rights to use: never clone a real person without their consent.')" />
+        </div>
 
         @if ($contact)
             <flux:input wire:model="note" :label="__('What changed (optional, kept with the version)')" :placeholder="__('Softened the sarcasm')" />

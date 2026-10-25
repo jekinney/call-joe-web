@@ -3,10 +3,12 @@
 namespace App\Providers;
 
 use App\Contracts\LlmClient;
+use App\Contracts\VoiceProvider;
 use App\Enums\Feature;
 use App\Models\User;
 use App\Services\Entitlements;
 use App\Support\Llm\GroqClient;
+use App\Support\Voice\VapiClient;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -18,6 +20,13 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(Entitlements::class);
+
+        // Voice calls. Tests swap in App\Support\Voice\FakeVoiceProvider (tests/TestCase.php).
+        $this->app->singleton(VoiceProvider::class, fn () => new VapiClient(
+            (string) config('services.vapi.private_key'),
+            (string) config('services.vapi.public_key'),
+            (string) config('services.vapi.base_url'),
+        ));
 
         // The AI provider. Tests swap in App\Support\Llm\FakeLlmClient (tests/TestCase.php).
         $this->app->singleton(LlmClient::class, fn () => new GroqClient(

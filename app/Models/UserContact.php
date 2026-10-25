@@ -59,6 +59,12 @@ class UserContact extends Model
         return $this->hasMany(Message::class);
     }
 
+    /** @return HasMany<Call, $this> */
+    public function calls(): HasMany
+    {
+        return $this->hasMany(Call::class);
+    }
+
     /** @return HasOne<Memory, $this> */
     public function memory(): HasOne
     {
