@@ -13,6 +13,8 @@ new #[Layout('components.layouts.auth')] class extends Component {
     public string $email = '';
     public string $password = '';
     public string $password_confirmation = '';
+    public string $date_of_birth = '';
+    public string $timezone = 'UTC'; // filled in from the browser
 
     /**
      * Handle an incoming registration request.
@@ -23,6 +25,10 @@ new #[Layout('components.layouts.auth')] class extends Component {
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
             'password' => ['required', 'string', 'confirmed', Rules\Password::defaults()],
+            'date_of_birth' => User::birthDateRules(),
+            'timezone' => User::timezoneRules(),
+        ], [
+            'date_of_birth.before_or_equal' => __('Call Joe is only for adults (18 and over).'),
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -51,6 +57,14 @@ new #[Layout('components.layouts.auth')] class extends Component {
         <div class="grid gap-2">
             <flux:input wire:model="email" id="email" label="{{ __('Email address') }}" type="email" name="email" required autocomplete="email" placeholder="email@example.com" />
         </div>
+
+        <!-- Date of birth (adults only) -->
+        <div class="grid gap-2">
+            <flux:input wire:model="date_of_birth" id="date_of_birth" label="{{ __('Date of birth') }}" type="date" name="date_of_birth" required autocomplete="bday" :max="now()->subYears(\App\Models\User::MINIMUM_AGE)->toDateString()" description="{{ __('Call Joe is for adults (18 and over).') }}" />
+        </div>
+
+        <!-- Their timezone, so contacts know their time of day -->
+        <input type="hidden" wire:model="timezone" x-data x-init="$wire.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'" />
 
         <!-- Password -->
         <div class="grid gap-2">

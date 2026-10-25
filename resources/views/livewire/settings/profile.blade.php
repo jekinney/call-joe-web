@@ -8,7 +8,9 @@ use Livewire\Volt\Component;
 
 new class extends Component {
     public string $name = '';
+    public string $display_name = '';
     public string $email = '';
+    public string $timezone = 'UTC';
 
     /**
      * Mount the component.
@@ -16,7 +18,9 @@ new class extends Component {
     public function mount(): void
     {
         $this->name = Auth::user()->name;
+        $this->display_name = Auth::user()->display_name ?? '';
         $this->email = Auth::user()->email;
+        $this->timezone = Auth::user()->timezone;
     }
 
     /**
@@ -28,6 +32,8 @@ new class extends Component {
 
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
+            'display_name' => ['nullable', 'string', 'max:60'],
+            'timezone' => User::timezoneRules(),
 
             'email' => [
                 'required',
@@ -39,7 +45,7 @@ new class extends Component {
             ],
         ]);
 
-        $user->fill($validated);
+        $user->fill([...$validated, 'display_name' => $validated['display_name'] ?: null]);
 
         if ($user->isDirty('email')) {
             $user->email_verified_at = null;
@@ -72,9 +78,17 @@ new class extends Component {
 <section class="w-full">
     @include('partials.settings-heading')
 
-    <x-settings.layout heading="Profile" subheading="Update your name and email address">
+    <x-settings.layout heading="Profile" subheading="Update your name, email address and timezone">
         <form wire:submit="updateProfileInformation" class="my-6 w-full space-y-6">
             <flux:input wire:model="name" label="{{ __('Name') }}" type="text" name="name" required autofocus autocomplete="name" />
+
+            <flux:input wire:model="display_name" label="{{ __('What your contacts call you') }}" type="text" name="display_name" autocomplete="nickname" :placeholder="\Illuminate\Support\Str::before($name, ' ')" description="{{ __('Leave it empty to use your first name.') }}" />
+
+            <flux:select wire:model="timezone" label="{{ __('Timezone') }}" name="timezone" description="{{ __('So your contacts know your time of day.') }}">
+                @foreach (timezone_identifiers_list() as $zone)
+                    <flux:select.option :value="$zone">{{ str_replace('_', ' ', $zone) }}</flux:select.option>
+                @endforeach
+            </flux:select>
 
             <div>
                 <flux:input wire:model="email" label="{{ __('Email') }}" type="email" name="email" required autocomplete="email" />

@@ -28,6 +28,9 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
+            'date_of_birth' => now()->subYears(fake()->numberBetween(21, 70))->toDateString(),
+            'timezone' => 'UTC',
+            'locale' => 'en',
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
@@ -40,6 +43,36 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Someone who runs the service (/admin).
+     */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_admin' => true,
+        ]);
+    }
+
+    /**
+     * Someone under 18 (never allowed in).
+     */
+    public function minor(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'date_of_birth' => now()->subYears(16)->toDateString(),
+        ]);
+    }
+
+    /**
+     * An account with no birthday on file.
+     */
+    public function withoutBirthDate(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'date_of_birth' => null,
         ]);
     }
 }

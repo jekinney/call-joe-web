@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\HomeController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
@@ -7,16 +8,28 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-Route::view('dashboard', 'dashboard')
+// "Home" after logging in: admins to /admin, everyone else to /app.
+Route::get('home', HomeController::class)
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
-Route::middleware(['auth'])->group(function () {
-    Route::redirect('settings', 'settings/profile');
+// The phone: signed in, email verified, and an adult.
+Route::prefix('app')->name('app.')->middleware(['auth', 'verified', 'adult'])->group(function () {
+    Route::view('/', 'app.home')->name('home');
+});
 
-    Volt::route('settings/profile', 'settings.profile')->name('settings.profile');
-    Volt::route('settings/password', 'settings.password')->name('settings.password');
-    Volt::route('settings/appearance', 'settings.appearance')->name('settings.appearance');
+// Settings stay reachable before verifying, so a mistyped email can be fixed.
+Route::prefix('app/settings')->middleware(['auth'])->group(function () {
+    Route::redirect('/', '/app/settings/profile');
+
+    Volt::route('profile', 'settings.profile')->name('settings.profile');
+    Volt::route('password', 'settings.password')->name('settings.password');
+    Volt::route('appearance', 'settings.appearance')->name('settings.appearance');
+});
+
+// Running the service: admins only.
+Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'can:admin'])->group(function () {
+    Route::view('/', 'admin.home')->name('home');
 });
 
 require __DIR__.'/auth.php';
