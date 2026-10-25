@@ -142,6 +142,11 @@ it('says "no limit" counts for plans without a contact limit', function () {
     $this->actingAs($this->user)->get(route('app.contacts'))->assertSee('0 on your phone');
 });
 
+it('names each page in the browser tab', function () {
+    $this->actingAs($this->user)->get(route('app.catalog'))->assertSee('<title>Catalog · Call Joe</title>', false);
+    $this->actingAs($this->user)->get(route('app.contacts'))->assertSee('<title>My contacts · Call Joe</title>', false);
+});
+
 it('is linked from the sidebar', function () {
     $this->actingAs($this->user)->get('/app')->assertSee(route('app.catalog'))->assertSee(route('app.contacts'));
 });
