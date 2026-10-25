@@ -6,6 +6,8 @@ use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -22,6 +24,9 @@ use Illuminate\Support\Str;
  * @property string $timezone
  * @property string $locale
  * @property Carbon|null $last_seen_at
+ * @property int|null $plan_id
+ * @property Carbon|null $plan_expires_at
+ * @property-read Plan|null $plan
  */
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -80,6 +85,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'date_of_birth' => 'date',
             'is_admin' => 'boolean',
             'last_seen_at' => 'datetime',
+            'plan_expires_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -93,6 +99,26 @@ class User extends Authenticatable implements MustVerifyEmail
             ->explode(' ')
             ->map(fn (string $name) => Str::of($name)->substr(0, 1))
             ->implode('');
+    }
+
+    /**
+     * Their own plan, if any (no plan, or an expired one, means the default: see App\Services\Entitlements).
+     *
+     * @return BelongsTo<Plan, $this>
+     */
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
+    }
+
+    /**
+     * Their plan history, newest first.
+     *
+     * @return HasMany<PlanChange, $this>
+     */
+    public function planChanges(): HasMany
+    {
+        return $this->hasMany(PlanChange::class)->latest('id');
     }
 
     /**

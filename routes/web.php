@@ -18,6 +18,7 @@ Route::get('home', HomeController::class)
 Route::prefix('app')->name('app.')->middleware(['auth', 'verified', 'adult'])->group(function () {
     Route::view('/', 'app.home')->name('home');
     Route::post('presence', PresenceController::class)->middleware('throttle:10,1')->name('presence');
+    Volt::route('plan', 'app.plan')->name('plan');
 });
 
 // Settings stay reachable before verifying, so a mistyped email can be fixed.
@@ -32,6 +33,8 @@ Route::prefix('app/settings')->middleware(['auth'])->group(function () {
 // Running the service: admins only.
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'can:admin'])->group(function () {
     Route::view('/', 'admin.home')->name('home');
+    Volt::route('users', 'admin.users.index')->name('users.index');
+    Volt::route('users/{user}', 'admin.users.show')->name('users.show');
 });
 
 require __DIR__.'/auth.php';
