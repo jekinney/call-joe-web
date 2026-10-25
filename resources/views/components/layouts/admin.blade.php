@@ -17,6 +17,7 @@
                 <flux:navlist.group :heading="__('Admin')" class="grid">
                     <flux:navlist.item icon="home" :href="route('admin.home')" :current="request()->routeIs('admin.home')" wire:navigate>{{ __('Overview') }}</flux:navlist.item>
                     <flux:navlist.item icon="users" :href="route('admin.users.index')" :current="request()->routeIs('admin.users.*')" wire:navigate>{{ __('Users') }}</flux:navlist.item>
+                    <flux:navlist.item icon="user-group" :href="route('admin.contacts.index')" :current="request()->routeIs('admin.contacts.*')" wire:navigate>{{ __('Contacts') }}</flux:navlist.item>
                 </flux:navlist.group>
             </flux:navlist>
 

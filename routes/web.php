@@ -35,6 +35,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'can:adm
     Route::view('/', 'admin.home')->name('home');
     Volt::route('users', 'admin.users.index')->name('users.index');
     Volt::route('users/{user}', 'admin.users.show')->name('users.show');
+    Volt::route('contacts', 'admin.contacts.index')->name('contacts.index');
+    Volt::route('contacts/new', 'admin.contacts.edit')->name('contacts.create');
+    Volt::route('contacts/{contact}', 'admin.contacts.edit')->name('contacts.edit');
 });
 
 require __DIR__.'/auth.php';

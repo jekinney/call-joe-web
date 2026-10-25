@@ -3,21 +3,20 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seed the application's database.
+     * Local development data. Safe to run again.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // A local test account (password: "password", from the factory). Never used outside development.
+        if (! User::where('email', 'test@example.com')->exists()) {
+            User::factory()->create(['name' => 'Test User', 'email' => 'test@example.com']);
+        }
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        $this->call(ContactSeeder::class);
     }
 }
