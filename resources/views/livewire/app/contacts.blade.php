@@ -20,7 +20,7 @@ new #[Title('My contacts')] class extends Component {
         $user = auth()->user();
 
         return [
-            'entries' => $user->userContacts()->with('contact')->get(),
+            'entries' => $user->userContacts()->with(['contact', 'relationship'])->get(),
             'count' => $phonebook->count($user),
             'limit' => $phonebook->limit($user),
         ];
@@ -42,7 +42,7 @@ new #[Title('My contacts')] class extends Component {
                 <flux:avatar :src="$entry->contact->avatarUrl()" :name="$entry->contact->name" />
                 <div>
                     <flux:heading>{{ $entry->displayName() }}</flux:heading>
-                    <flux:text size="sm">{{ $entry->contact->tagline }}</flux:text>
+                    <flux:text size="sm">{{ __($entry->relationship?->label ?? 'Friend') }} · {{ $entry->contact->tagline }}</flux:text>
                 </div>
             </a>
             <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="remove({{ $entry->id }})"

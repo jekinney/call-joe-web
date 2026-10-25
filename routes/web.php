@@ -41,6 +41,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'can:adm
     Volt::route('contacts', 'admin.contacts.index')->name('contacts.index');
     Volt::route('contacts/new', 'admin.contacts.edit')->name('contacts.create');
     Volt::route('contacts/{contact}', 'admin.contacts.edit')->name('contacts.edit');
+    Volt::route('prompt-preview', 'admin.prompt-preview')->name('prompt-preview');
 });
 
 require __DIR__.'/auth.php';

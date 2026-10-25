@@ -2,6 +2,7 @@
 
 use App\Enums\AddCheck;
 use App\Models\Contact;
+use App\Models\Relationship;
 use App\Services\Phonebook;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -14,12 +15,30 @@ new #[Title('Catalog')] class extends Component {
     #[Url]
     public bool $availableOnly = false;
 
+    /** The contact being added, while the user picks who they are to them. */
+    public ?int $adding = null;
+
+    public string $relationshipId = '';
+
+    public function startAdding(int $contactId): void
+    {
+        $this->adding = $contactId;
+        $this->relationshipId = (string) Relationship::bySlug('friend')->id;
+    }
+
+    public function cancelAdding(): void
+    {
+        $this->adding = null;
+    }
+
     public function add(int $contactId, Phonebook $phonebook): void
     {
         $contact = Contact::published()->findOrFail($contactId);
+        $relationship = Relationship::findOrFail((int) $this->relationshipId);
 
         try {
-            $phonebook->add(auth()->user(), $contact);
+            $phonebook->add(auth()->user(), $contact, $relationship);
+            $this->adding = null;
             $this->dispatch('contact-added', name: $contact->firstName());
         } catch (DomainException $e) {
             $this->addError('add', $e->getMessage());
@@ -95,8 +114,22 @@ new #[Title('Catalog')] class extends Component {
                             <flux:button size="sm" :href="route('app.plan')" wire:navigate>{{ __('See plans') }}</flux:button>
                             @break
                         @default
-                            <span></span>
-                            <flux:button size="sm" variant="primary" icon="plus" wire:click="add({{ $contact->id }})">{{ __('Add') }}</flux:button>
+                            @if ($adding === $contact->id)
+                                <div class="flex w-full flex-col gap-2">
+                                    <flux:select wire:model="relationshipId" size="sm" :label="__(':name is my…', ['name' => $contact->firstName()])">
+                                        @foreach (\App\Models\Relationship::for($contact)->get() as $relationship)
+                                            <flux:select.option :value="$relationship->id">{{ __($relationship->label) }}</flux:select.option>
+                                        @endforeach
+                                    </flux:select>
+                                    <div class="flex justify-end gap-2">
+                                        <flux:button size="sm" variant="ghost" wire:click="cancelAdding">{{ __('Cancel') }}</flux:button>
+                                        <flux:button size="sm" variant="primary" icon="plus" wire:click="add({{ $contact->id }})">{{ __('Add to my phone') }}</flux:button>
+                                    </div>
+                                </div>
+                            @else
+                                <span></span>
+                                <flux:button size="sm" variant="primary" icon="plus" wire:click="startAdding({{ $contact->id }})">{{ __('Add') }}</flux:button>
+                            @endif
                     @endswitch
                 </div>
             </div>

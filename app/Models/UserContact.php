@@ -14,18 +14,20 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $user_id
  * @property int $contact_id
+ * @property int|null $relationship_id
  * @property string|null $nickname
  * @property bool $is_active
  * @property Carbon $added_at
  * @property Carbon|null $deleted_at
  * @property-read Contact $contact
+ * @property-read Relationship|null $relationship
  * @property-read User $user
  */
 class UserContact extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['user_id', 'contact_id', 'nickname', 'is_active', 'added_at'];
+    protected $fillable = ['user_id', 'contact_id', 'relationship_id', 'nickname', 'is_active', 'added_at'];
 
     protected $attributes = ['is_active' => true];
 
@@ -38,6 +40,12 @@ class UserContact extends Model
     public function contact(): BelongsTo
     {
         return $this->belongsTo(Contact::class)->withTrashed();
+    }
+
+    /** @return BelongsTo<Relationship, $this> */
+    public function relationship(): BelongsTo
+    {
+        return $this->belongsTo(Relationship::class);
     }
 
     /** @return BelongsTo<User, $this> */

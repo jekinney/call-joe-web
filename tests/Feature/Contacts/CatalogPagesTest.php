@@ -40,9 +40,11 @@ it('searches, and can hide contacts the plan does not include', function () {
 });
 
 it('adds from the catalog', function () {
-    $joe = Contact::factory()->published()->create();
+    $joe = Contact::factory()->published()->create(['name' => 'Joe Tucker', 'gender' => 'man']);
 
     Volt::actingAs($this->user)->test('app.catalog')
+        ->call('startAdding', $joe->id)
+        ->assertSee('Joe is my')
         ->call('add', $joe->id)
         ->assertHasNoErrors()
         ->assertDispatched('contact-added')
@@ -58,6 +60,7 @@ it('shows why adding failed, and offers plans when full', function () {
 
     Volt::actingAs($this->user)->test('app.catalog')
         ->assertSee('Your contacts are full')
+        ->call('startAdding', $c->id)
         ->call('add', $c->id)
         ->assertHasErrors('add');
 });
@@ -65,7 +68,7 @@ it('shows why adding failed, and offers plans when full', function () {
 it('cannot add a draft by guessing its id', function () {
     $draft = Contact::factory()->create();
 
-    Volt::actingAs($this->user)->test('app.catalog')->call('add', $draft->id)->assertStatus(404);
+    Volt::actingAs($this->user)->test('app.catalog')->call('startAdding', $draft->id)->call('add', $draft->id)->assertStatus(404);
     expect(UserContact::count())->toBe(0);
 });
 

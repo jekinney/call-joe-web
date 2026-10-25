@@ -2,6 +2,7 @@
 
 use App\Enums\AddCheck;
 use App\Models\Contact;
+use App\Models\Relationship;
 use App\Services\Phonebook;
 use Livewire\Attributes\Title;
 use Livewire\Volt\Component;
@@ -9,20 +10,42 @@ use Livewire\Volt\Component;
 new #[Title('Contact')] class extends Component {
     public Contact $contact;
 
+    /** Who they are (or will be) to the user. */
+    public string $relationshipId = '';
+
     public function mount(Contact $contact, Phonebook $phonebook): void
     {
+        $entry = $phonebook->entry(auth()->user(), $contact);
+
         // Hidden or removed from the catalog: only people who already have them can still see them.
-        abort_unless($contact->is_published || $phonebook->entry(auth()->user(), $contact), 404);
+        abort_unless($contact->is_published || $entry, 404);
         $this->contact = $contact;
+        $this->relationshipId = (string) ($entry?->relationship_id ?? Relationship::bySlug('friend')->id);
     }
 
     public function add(Phonebook $phonebook): void
     {
         try {
-            $phonebook->add(auth()->user(), $this->contact);
+            $phonebook->add(auth()->user(), $this->contact, Relationship::findOrFail((int) $this->relationshipId));
             $this->dispatch('contact-added', name: $this->contact->firstName());
         } catch (DomainException $e) {
             $this->addError('add', $e->getMessage());
+        }
+    }
+
+    /** Changing who they are, once they're on the phone. */
+    public function updatedRelationshipId(Phonebook $phonebook): void
+    {
+        $entry = $phonebook->entry(auth()->user(), $this->contact);
+        if (! $entry) {
+            return;
+        }
+
+        try {
+            $phonebook->setRelationship($entry, Relationship::findOrFail((int) $this->relationshipId));
+            $this->dispatch('relationship-saved');
+        } catch (DomainException $e) {
+            $this->addError('relationshipId', $e->getMessage());
         }
     }
 
@@ -36,7 +59,10 @@ new #[Title('Contact')] class extends Component {
      */
     public function with(Phonebook $phonebook): array
     {
-        return ['check' => $phonebook->check(auth()->user(), $this->contact)];
+        return [
+            'check' => $phonebook->check(auth()->user(), $this->contact),
+            'relationships' => Relationship::for($this->contact)->get(),
+        ];
     }
 }; ?>
 
@@ -54,15 +80,26 @@ new #[Title('Contact')] class extends Component {
         </div>
     </div>
 
-    <div class="flex flex-col gap-2">
+    <div class="flex max-w-sm flex-col gap-3">
         @if ($check === AddCheck::AlreadyAdded)
             <flux:text>{{ __(':name is on your phone.', ['name' => $contact->firstName()]) }}</flux:text>
+            <flux:select wire:model.live="relationshipId" :label="__(':name is my…', ['name' => $contact->firstName()])">
+                @foreach ($relationships as $relationship)
+                    <flux:select.option :value="$relationship->id">{{ __($relationship->label) }}</flux:select.option>
+                @endforeach
+            </flux:select>
+            <x-action-message on="relationship-saved">{{ __('Saved.') }}</x-action-message>
             <div>
                 <flux:button wire:click="remove" wire:confirm="{{ __('Remove :name from your phone? Everything you shared is kept, and comes back if you add them again.', ['name' => $contact->firstName()]) }}">
                     {{ __('Remove from my phone') }}
                 </flux:button>
             </div>
         @elseif ($check === AddCheck::Ok)
+            <flux:select wire:model="relationshipId" :label="__(':name is my…', ['name' => $contact->firstName()])">
+                @foreach ($relationships as $relationship)
+                    <flux:select.option :value="$relationship->id">{{ __($relationship->label) }}</flux:select.option>
+                @endforeach
+            </flux:select>
             <div><flux:button variant="primary" icon="plus" wire:click="add">{{ __('Add :name to my phone', ['name' => $contact->firstName()]) }}</flux:button></div>
         @else
             <flux:callout icon="information-circle" :heading="__($check->message())" />
@@ -71,5 +108,6 @@ new #[Title('Contact')] class extends Component {
             @endif
         @endif
         <flux:error name="add" />
+        <flux:error name="relationshipId" />
     </div>
 </div>

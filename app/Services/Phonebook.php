@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\AddCheck;
 use App\Models\Contact;
+use App\Models\Relationship;
 use App\Models\User;
 use App\Models\UserContact;
 use DomainException;
@@ -56,13 +57,17 @@ class Phonebook
     }
 
     /**
-     * Puts the contact on the user's phone (bringing back their earlier entry if they had one).
+     * Puts the contact on the user's phone as who they are to the user (Friend if not chosen), bringing back their
+     * earlier entry if they had one.
      *
-     * @throws DomainException with the AddCheck's message when they can't.
+     * @throws DomainException with the reason when they can't.
      */
-    public function add(User $user, Contact $contact): UserContact
+    public function add(User $user, Contact $contact, ?Relationship $relationship = null): UserContact
     {
-        return DB::transaction(function () use ($user, $contact) {
+        $relationship ??= Relationship::bySlug('friend');
+        $this->ensureSuits($relationship, $contact);
+
+        return DB::transaction(function () use ($user, $contact, $relationship) {
             // One add at a time per user, so two at once can't both squeeze under the limit.
             User::whereKey($user->id)->lockForUpdate()->first();
 
@@ -74,12 +79,35 @@ class Phonebook
             $earlier = UserContact::onlyTrashed()->where('user_id', $user->id)->where('contact_id', $contact->id)->first();
             if ($earlier) {
                 $earlier->restore();
+                $earlier->update(['relationship_id' => $relationship->id]);
 
                 return $earlier;
             }
 
-            return UserContact::create(['user_id' => $user->id, 'contact_id' => $contact->id, 'added_at' => now()]);
+            return UserContact::create([
+                'user_id' => $user->id, 'contact_id' => $contact->id, 'relationship_id' => $relationship->id, 'added_at' => now(),
+            ]);
         });
+    }
+
+    /**
+     * Changes who the contact is to the user.
+     *
+     * @throws DomainException when that relationship doesn't suit the contact.
+     */
+    public function setRelationship(UserContact $entry, Relationship $relationship): UserContact
+    {
+        $this->ensureSuits($relationship, $entry->contact);
+        $entry->update(['relationship_id' => $relationship->id]);
+
+        return $entry->setRelation('relationship', $relationship);
+    }
+
+    private function ensureSuits(Relationship $relationship, Contact $contact): void
+    {
+        if (! $relationship->suits($contact)) {
+            throw new DomainException("{$contact->firstName()} can't be your ".strtolower($relationship->label).'.');
+        }
     }
 
     /**
