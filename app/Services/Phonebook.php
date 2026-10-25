@@ -79,7 +79,8 @@ class Phonebook
             $earlier = UserContact::onlyTrashed()->where('user_id', $user->id)->where('contact_id', $contact->id)->first();
             if ($earlier) {
                 $earlier->restore();
-                $earlier->update(['relationship_id' => $relationship->id]);
+                // Back on the phone: their silence counts from now, not from before they were removed.
+                $earlier->forceFill(['relationship_id' => $relationship->id, 'last_heard_at' => now(), 'worry_stage' => 0, 'worry_started_at' => null])->save();
 
                 return $earlier;
             }

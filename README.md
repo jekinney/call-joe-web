@@ -32,6 +32,9 @@ Then open http://localhost:8090.
 | Mailpit | Catches every email the app sends | http://localhost:8025 |
 | Reverb | Real-time WebSockets (texts, rings, notices) | ws://localhost:8091 |
 | Queue | Background jobs and broadcasts | (no port) |
+| Scheduler | Contacts reaching out on their own (`outreach:run`, every minute) | (no port) |
+
+Contacts keep living while you're away: the scheduler moves each one through their relationship's worry stages and plans texts and calls (`App\Services\Outreach`). Calls ring your open page or become missed calls; texts are written only when you're online to read them, with their original times. Try it with `./vendor/bin/sail artisan outreach:run`.
 
 To see real-time delivery, sign in and run `./vendor/bin/sail artisan app:notify you@example.com "Hello"`: the notice pops up on your open page. A page checks in every 45 seconds; the server counts you as online while it does (`App\Services\Presence`).
 

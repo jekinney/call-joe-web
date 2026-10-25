@@ -12,10 +12,10 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $user_contact_id
  * @property string $direction outgoing | incoming
- * @property string $status starting | active | ended | failed
+ * @property string $status ringing | missed (incoming only) | starting | active | ended | failed
  * @property string|null $vapi_assistant_id
  * @property string|null $vapi_call_id
- * @property string $prompt_hash
+ * @property string|null $prompt_hash none until it's answered
  * @property int $max_seconds
  * @property Carbon|null $started_at
  * @property Carbon|null $ended_at
@@ -34,6 +34,14 @@ class Call extends Model
     public const ENDED = 'ended';
 
     public const FAILED = 'failed';
+
+    /** A contact is calling the user right now. */
+    public const RINGING = 'ringing';
+
+    /** A contact called and the user didn't answer (or was away). */
+    public const MISSED = 'missed';
+
+    public const INCOMING = 'incoming';
 
     protected $fillable = [
         'user_contact_id', 'direction', 'status', 'vapi_assistant_id', 'vapi_call_id', 'prompt_hash', 'max_seconds',
@@ -56,7 +64,7 @@ class Call extends Model
 
     public function isOver(): bool
     {
-        return in_array($this->status, [self::ENDED, self::FAILED], true);
+        return in_array($this->status, [self::ENDED, self::FAILED, self::MISSED], true);
     }
 
     /** "4 min" or "35 sec". */

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\DeclineCallController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\VapiWebhookController;
@@ -32,6 +33,7 @@ Route::prefix('app')->name('app.')->middleware(['auth', 'verified', 'adult'])->g
     Volt::route('chat/{contact:slug}', 'app.chat')->name('chat');
     Volt::route('memory/{contact:slug}', 'app.memory')->name('memory');
     Volt::route('call/{contact:slug}', 'app.call')->name('call');
+    Route::post('calls/{call}/decline', DeclineCallController::class)->name('calls.decline');
 });
 
 // Settings stay reachable before verifying, so a mistyped email can be fixed.
@@ -41,6 +43,7 @@ Route::prefix('app/settings')->middleware(['auth'])->group(function () {
     Volt::route('profile', 'settings.profile')->name('settings.profile');
     Volt::route('password', 'settings.password')->name('settings.password');
     Volt::route('appearance', 'settings.appearance')->name('settings.appearance');
+    Volt::route('away', 'settings.away')->name('settings.away');
 });
 
 // Running the service: admins only.

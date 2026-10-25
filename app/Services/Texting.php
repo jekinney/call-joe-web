@@ -61,6 +61,7 @@ class Texting
         }
 
         $message = $entry->messages()->create(['sender' => Message::FROM_USER, 'body' => $body]);
+        $entry->markHeard();
         SendContactReply::dispatch($message->id);
 
         return $message;
@@ -96,6 +97,10 @@ class Texting
             ContactReplyFailed::dispatch($user, $trigger);
 
             return [];
+        }
+
+        if ($entry->relief_stage !== null) {
+            $entry->clearRelief(); // the relieved welcome is in this reply
         }
 
         $bubbles = [];
@@ -144,17 +149,22 @@ class Texting
     }
 
     /**
-     * The frozen prompt, then recent texts up to this one, as user/assistant turns.
+     * The frozen prompt, then recent texts up to this one in time order (texts written for a backlog keep their
+     * earlier times), as user/assistant turns. After a worried stretch, a note at the end asks for a relieved welcome
+     * (at the end, so the cached prompt stays the same).
      *
      * @return list<array{role: string, content: string}>
      */
     private function messagesFor(Conversation $conversation, UserContact $entry, Message $trigger): array
     {
-        $history = $entry->messages()->where('id', '<=', $trigger->id)->orderByDesc('id')->limit(self::HISTORY)->get()->reverse();
+        $history = $entry->messages()->where('created_at', '<=', $trigger->created_at)->where('id', '!=', $trigger->id)
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(self::HISTORY - 1)->get()->reverse()->push($trigger);
+        $relief = $entry->reliefNote();
 
         return [
             ['role' => 'system', 'content' => $conversation->prompt_text],
             ...$history->map(fn (Message $m) => ['role' => $m->fromUser() ? 'user' : 'assistant', 'content' => $m->body])->values()->all(),
+            ...($relief ? [['role' => 'system', 'content' => $relief]] : []),
         ];
     }
 }

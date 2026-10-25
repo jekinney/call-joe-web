@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\PromptRule;
 use App\Models\Relationship;
+use App\Models\User;
 use App\Models\UserContact;
 use App\Support\PromptSnapshot;
 use Carbon\CarbonImmutable;
@@ -38,7 +39,7 @@ class PromptBuilder
             'relationship' => "# Who you are to {$buddy}\n".trim($relationship->promptFor($contactName, $buddy))."\n".($relationship->allows_romance
                 ? 'Romance is part of this relationship: be affectionate and warm, suggestive at most, never explicit.'
                 : "Never flirt or be romantic with {$buddy}."),
-            'buddy' => "# About {$buddy}\n- They go by {$buddy} (full name: {$user->name}).\n- They live in the {$user->timezone} timezone.",
+            'buddy' => "# About {$buddy}\n- They go by {$buddy} (full name: {$user->name}).\n- They live in the {$user->timezone} timezone.".$this->away($user, $now),
             'memory' => "# What you remember about {$buddy}\n".(trim((string) $memory) !== ''
                 ? trim((string) $memory)
                 : "You don't know much about {$buddy} yet. Get to know them, and remember what they tell you."),
@@ -48,5 +49,22 @@ class PromptBuilder
         $text = implode("\n\n", $sections);
 
         return new PromptSnapshot($text, hash('sha256', $text), $sections);
+    }
+
+    /** Away mode: while they're away, contacts know not to worry; for a week after, they ask how it went. */
+    private function away(User $user, CarbonImmutable $now): string
+    {
+        if ($user->away_until === null) {
+            return '';
+        }
+
+        $where = $user->away_note ? " ({$user->away_note})" : '';
+        if ($user->away_until->gt($now)) {
+            $until = $user->away_until->setTimezone($user->timezone)->format('l, F j');
+
+            return "\n- They told you they're away until {$until}{$where}. Don't worry about them; wish them a good time.";
+        }
+
+        return $user->away_until->gt($now->subDays(7)) ? "\n- They were just away{$where}. Ask how it went." : '';
     }
 }

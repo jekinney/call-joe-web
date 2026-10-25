@@ -14,7 +14,8 @@ use Illuminate\Support\Carbon;
  * @property int|null $conversation_id
  * @property string $sender user | contact
  * @property string $body
- * @property array<string, mixed>|null $meta e.g. reply_failed: true when the contact couldn't answer it
+ * @property array<string, mixed>|null $meta e.g. reply_failed: true when the contact couldn't answer it; outreach
+ *                                           (the event id), missed or voicemail for things the contact sent on their own
  * @property Carbon|null $read_at
  * @property Carbon $created_at
  */
@@ -47,5 +48,11 @@ class Message extends Model
     public function replyFailed(): bool
     {
         return (bool) ($this->meta['reply_failed'] ?? false);
+    }
+
+    /** The contact reached out on their own (a text, missed call or voicemail), not a reply. */
+    public function cameUnasked(): bool
+    {
+        return isset($this->meta['outreach']) || isset($this->meta['missed']) || isset($this->meta['voicemail']);
     }
 }

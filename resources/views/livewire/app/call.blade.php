@@ -6,9 +6,11 @@ use App\Models\Contact;
 use App\Models\UserContact;
 use App\Services\Calling;
 use App\Services\Entitlements;
+use App\Services\Outreach;
 use App\Services\Phonebook;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Volt\Component;
 
 new #[Title('Call')] class extends Component {
@@ -21,19 +23,28 @@ new #[Title('Call')] class extends Component {
 
     public string $problem = '';
 
+    /** The contact's ringing call the user is picking up (from the ringing screen's Answer). */
+    #[Url]
+    public ?int $answer = null;
+
     public function mount(Contact $contact, Phonebook $phonebook): void
     {
         $this->entry = $phonebook->entry(auth()->user(), $contact) ?? abort(404);
     }
 
-    public function start(Calling $calling): void
+    public function start(Calling $calling, Outreach $outreach): void
     {
         $this->problem = '';
+        $ringing = $this->answer ? $this->entry->calls()->find($this->answer) : null;
+        $this->answer = null;
 
         try {
-            $call = $calling->start(auth()->user(), $this->entry);
+            $call = $calling->start(auth()->user(), $this->entry, $ringing);
         } catch (DomainException $e) {
             $this->problem = $e->getMessage();
+            if ($ringing) {
+                $outreach->missed($ringing); // couldn't pick up (no call time left): it's a missed call
+            }
 
             return;
         }
@@ -100,6 +111,9 @@ new #[Title('Call')] class extends Component {
 <div class="mx-auto flex w-full max-w-md flex-col items-center gap-6 py-6 text-center" x-data="{ talking: false, muted: false }"
     x-on:vapi-speech.window="talking = $event.detail.talking" x-on:vapi-muted.window="muted = $event.detail.muted">
     <a href="{{ route('app.chat', $contact) }}" class="self-start text-sm" wire:navigate>← {{ __('Texts') }}</a>
+    @if ($answer)
+        <div wire:init="start" data-answering></div>
+    @endif
 
     <div class="relative">
         <flux:avatar class="size-32!" :src="$contact->avatarUrl()" :name="$contact->name" />

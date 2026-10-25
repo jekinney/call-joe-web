@@ -59,6 +59,21 @@ services:
             - pgsql
             - valkey
             - reverb
+    # The scheduler: contacts reaching out on their own (php artisan outreach:run, every minute).
+    scheduler:
+        image: 'sail-8.5/app'
+        command: ['php', 'artisan', 'schedule:work']
+        restart: unless-stopped
+        environment:
+            WWWUSER: '${WWWUSER}'
+            LARAVEL_SAIL: 1
+        volumes:
+            - '.:/var/www/html'
+        networks:
+            - sail
+        depends_on:
+            - pgsql
+            - valkey
     pgsql:
         image: 'postgres:18-alpine'
         ports:

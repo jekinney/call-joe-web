@@ -4,6 +4,7 @@
             <flux:navlist.item href="{{ route('settings.profile') }}" wire:navigate>Profile</flux:navlist.item>
             <flux:navlist.item href="{{ route('settings.password') }}" wire:navigate>Password</flux:navlist.item>
             <flux:navlist.item href="{{ route('settings.appearance') }}" wire:navigate>Appearance</flux:navlist.item>
+            <flux:navlist.item href="{{ route('settings.away') }}" wire:navigate>Away mode</flux:navlist.item>
         </flux:navlist>
     </div>
 

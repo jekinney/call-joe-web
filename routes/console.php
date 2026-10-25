@@ -1,8 +1,6 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote')->hourly();
+// Contacts reach out on their own (App\Services\Outreach). Runs on the server whether or not anyone is online.
+Schedule::command('outreach:run')->everyMinute()->withoutOverlapping();

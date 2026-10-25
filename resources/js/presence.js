@@ -1,6 +1,8 @@
 // For a signed-in page in /app: tell the server "I'm here" (so contacts know you're online), and listen on your
 // private channel for live events. The server's Presence class decides online/offline from these check-ins.
 // Livewire's wire:navigate swaps pages without reloading this script, so setup re-runs after every navigation.
+import { listenForCalls } from './ringing';
+
 const HEARTBEAT_MS = 45 * 1000; // matches Presence::HEARTBEAT_SECONDS
 const meta = (name) => document.querySelector(`meta[name="${name}"]`)?.content;
 
@@ -35,7 +37,9 @@ function setUp() {
     listeningAs = userId;
     if (!userId) return;
 
-    window.Echo?.private(`App.Models.User.${userId}`).listen('.notice', (e) => showNotice(e.message));
+    const channel = window.Echo?.private(`App.Models.User.${userId}`);
+    channel?.listen('.notice', (e) => showNotice(e.message));
+    if (channel) listenForCalls(channel); // contacts calling you (resources/js/ringing.js)
     checkIn();
     heartbeat ??= setInterval(checkIn, HEARTBEAT_MS);
 }

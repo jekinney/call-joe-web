@@ -26,6 +26,8 @@ use Illuminate\Support\Str;
  * @property Carbon|null $last_seen_at
  * @property int|null $plan_id
  * @property Carbon|null $plan_expires_at
+ * @property Carbon|null $away_until away mode: contacts know and don't worry until then
+ * @property string|null $away_note e.g. "On vacation in Maine"
  * @property-read Plan|null $plan
  */
 class User extends Authenticatable implements MustVerifyEmail
@@ -86,6 +88,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_admin' => 'boolean',
             'last_seen_at' => 'datetime',
             'plan_expires_at' => 'datetime',
+            'away_until' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -137,6 +140,12 @@ class User extends Authenticatable implements MustVerifyEmail
     public function preferredName(): string
     {
         return $this->display_name ?: Str::before($this->name, ' ');
+    }
+
+    /** Away mode is on: they told their contacts they're away until a time still ahead. */
+    public function isAway(): bool
+    {
+        return $this->away_until !== null && $this->away_until->isFuture();
     }
 
     /**

@@ -23,7 +23,7 @@ function contactNamed(string $name)
 
 function textsFrom($entry, int $count): void
 {
-    foreach (range(1, $count) as $i) {
+    for ($i = 1; $i <= $count; $i++) {
         $entry->messages()->create(['sender' => 'contact', 'body' => "Text {$i} from {$entry->contact->firstName()}"]);
     }
 }
@@ -53,9 +53,23 @@ it('says welcome back in plain words', function (array $counts, ?string $expecte
     'nothing waiting' => [[], null],
     'one text' => [['Maya Brooks' => 1], 'Welcome back! Maya texted you.'],
     'several from one' => [['Maya Brooks' => 3], 'Welcome back! Maya texted you 3 times.'],
-    'two people' => [['Maya Brooks' => 1, 'Joe Tucker' => 1], 'Welcome back! Joe and Maya texted you.'],
-    'three people' => [['Maya Brooks' => 1, 'Joe Tucker' => 1, 'Ann Lee' => 1], 'Welcome back! Ann, Joe and 1 other texted you.'],
-    'four people' => [['Maya Brooks' => 1, 'Joe Tucker' => 1, 'Ann Lee' => 1, 'Bo Diaz' => 1], 'Welcome back! Bo, Ann and 2 others texted you.'],
+    'two people' => [['Maya Brooks' => 1, 'Joe Tucker' => 1], 'Welcome back! Joe and Maya reached out.'],
+    'three people' => [['Maya Brooks' => 1, 'Joe Tucker' => 1, 'Ann Lee' => 1], 'Welcome back! Ann, Joe and 1 other reached out.'],
+    'four people' => [['Maya Brooks' => 1, 'Joe Tucker' => 1, 'Ann Lee' => 1, 'Bo Diaz' => 1], 'Welcome back! Bo, Ann and 2 others reached out.'],
+]);
+
+it('counts missed calls apart from texts', function (int $texts, int $missed, string $expected) {
+    $maya = contactNamed('Maya Brooks');
+    textsFrom($maya, $texts);
+    foreach (range(1, $missed) as $i) {
+        $maya->messages()->create(['sender' => 'contact', 'body' => '📞 Missed call', 'meta' => ['missed' => true]]);
+    }
+
+    expect(app(Catchup::class)->welcomeMessage($this->user))->toBe($expected);
+})->with([
+    'texts and a call' => [2, 1, 'Welcome back! Maya texted you 2 times and called once.'],
+    'a text and calls' => [1, 3, 'Welcome back! Maya texted you and called 3 times.'],
+    'only a call' => [0, 1, 'Welcome back! Maya called you once.'],
 ]);
 
 it('reports how long someone was away when they come back', function () {

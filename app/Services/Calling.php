@@ -10,6 +10,7 @@ use App\Exceptions\VoiceException;
 use App\Jobs\UpdateMemory;
 use App\Models\Call;
 use App\Models\Message;
+use App\Models\OutreachEvent;
 use App\Models\User;
 use App\Models\UserContact;
 use DomainException;
@@ -42,13 +43,17 @@ class Calling
     ) {}
 
     /**
-     * Gets a call ready: returns the call, with the Vapi assistant the browser starts.
+     * Gets a call ready: returns the call, with the Vapi assistant the browser starts. With $answering, it's the
+     * user picking up the contact's ringing call (App\Services\Outreach), and the contact says why they called.
      *
      * @throws DomainException with a reason the user can read.
      */
-    public function start(User $user, UserContact $entry): Call
+    public function start(User $user, UserContact $entry, ?Call $answering = null): Call
     {
         $entry->loadMissing(['contact', 'user', 'relationship']);
+        if ($answering && ($answering->user_contact_id !== $entry->id || $answering->status !== Call::RINGING)) {
+            throw new DomainException('That call already ended.');
+        }
         $voice = $entry->contact->voice() ?? throw new DomainException("{$entry->displayName()} can't take calls yet.");
 
         $left = $this->entitlements->remaining($user, Metric::VoiceSeconds);
@@ -59,14 +64,25 @@ class Calling
         }
         $max = min($left ?? self::MAX_SECONDS, self::MAX_SECONDS);
 
-        $snapshot = $this->prompts->build($entry, $this->memory->notesFor($entry));
+        // Calling (or picking up) counts as hearing from the user: any worry ends, and turns into relief on this call.
+        $entry->markHeard();
+        $prompt = $this->prompts->build($entry, $this->memory->notesFor($entry))->text;
+        if ($relief = $entry->reliefNote()) {
+            $prompt .= "\n\n# Before this call\n{$relief}";
+            $entry->clearRelief();
+        }
+        if ($answering) {
+            $why = OutreachEvent::where('call_id', $answering->id)->value('tone') ?? 'to catch up';
+            $prompt .= "\n\n# This call\nYou called {$user->preferredName()} and they just picked up. Say hello and why you called: {$why}.";
+        }
         try {
             $model = $this->gateway->modelFor(LlmPurpose::Voice, $user);
         } catch (LlmException) {
             $model = $this->gateway->modelFor(LlmPurpose::Chat, $user);
         }
 
-        $call = $entry->calls()->create(['prompt_hash' => $snapshot->hash, 'max_seconds' => $max]);
+        $fields = ['status' => Call::STARTING, 'prompt_hash' => hash('sha256', $prompt), 'max_seconds' => $max];
+        $call = $answering ? tap($answering)->update($fields) : $entry->calls()->create($fields);
 
         try {
             $assistantId = $this->voice->createAssistant([
@@ -75,7 +91,7 @@ class Calling
                 'model' => [
                     'provider' => $model->provider,
                     'model' => $model->model_id,
-                    'messages' => [['role' => 'system', 'content' => $snapshot->text]],
+                    'messages' => [['role' => 'system', 'content' => $prompt]],
                     'temperature' => 0.8,
                     'maxTokens' => 250,
                 ],

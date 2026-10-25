@@ -96,7 +96,8 @@ new #[Title('Texts')] class extends Component {
 
         return [
             'contact' => $this->entry->contact,
-            'messages' => $this->entry->messages()->orderByDesc('id')->limit(50)->get()->reverse(),
+            // In time order: texts written after the user came back keep the earlier times they were "sent".
+            'messages' => $this->entry->messages()->orderByDesc('created_at')->orderByDesc('id')->limit(50)->get()->reverse(),
             'left' => $entitlements->remaining($user, Metric::TextMessages),
         ];
     }
@@ -120,12 +121,19 @@ new #[Title('Texts')] class extends Component {
         x-data x-init="$el.scrollTop = $el.scrollHeight" x-on:text-sent.window="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
         wire:poll.visible.60s>
         @forelse ($messages as $message)
-            <div @class(['flex flex-col', 'items-end' => $message->fromUser(), 'items-start' => ! $message->fromUser()]) wire:key="m-{{ $message->id }}" data-sender="{{ $message->sender }}">
+            <div @class(['flex flex-col', 'items-end' => $message->fromUser(), 'items-start' => ! $message->fromUser()]) wire:key="m-{{ $message->id }}" data-sender="{{ $message->sender }}"
+                title="{{ $message->created_at->setTimezone(auth()->user()->timezone)->format('D, M j g:i A') }}">
+                @if ($message->meta['voicemail'] ?? false)
+                    <span class="mb-1 text-xs text-zinc-500" data-voicemail>🎙 {{ __('Voicemail') }}</span>
+                @endif
                 <div @class([
                     'max-w-[80%] whitespace-pre-line rounded-2xl px-3 py-2 text-sm',
                     'bg-emerald-600 text-white' => $message->fromUser(),
                     'bg-zinc-100 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100' => ! $message->fromUser(),
                 ])>{{ $message->body }}</div>
+                @if ($message->cameUnasked())
+                    <span class="mt-0.5 text-xs text-zinc-500">{{ $message->created_at->setTimezone(auth()->user()->timezone)->format('D g:i A') }}</span>
+                @endif
                 @if ($message->replyFailed())
                     <button type="button" class="mt-1 text-xs text-red-600 underline" wire:click="retry({{ $message->id }})">
                         {{ __(':name couldn\'t answer. Try again', ['name' => $entry->displayName()]) }}
