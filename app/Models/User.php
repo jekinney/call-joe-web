@@ -122,6 +122,16 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * The contacts on their phone (not the ones they removed), newest first.
+     *
+     * @return HasMany<UserContact, $this>
+     */
+    public function userContacts(): HasMany
+    {
+        return $this->hasMany(UserContact::class)->latest('added_at');
+    }
+
+    /**
      * What contacts call them: their chosen name, or their first name.
      */
     public function preferredName(): string

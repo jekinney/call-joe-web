@@ -14,6 +14,8 @@
             <flux:navlist variant="outline">
                 <flux:navlist.group :heading="__('Call Joe')" class="grid">
                     <flux:navlist.item icon="home" :href="route('app.home')" :current="request()->routeIs('app.home')" wire:navigate>{{ __('Home') }}</flux:navlist.item>
+                    <flux:navlist.item icon="users" :href="route('app.contacts')" :current="request()->routeIs('app.contacts')" wire:navigate>{{ __('My contacts') }}</flux:navlist.item>
+                    <flux:navlist.item icon="sparkles" :href="route('app.catalog')" :current="request()->routeIs('app.catalog*')" wire:navigate>{{ __('Catalog') }}</flux:navlist.item>
                     <flux:navlist.item icon="chart-bar" :href="route('app.plan')" :current="request()->routeIs('app.plan')" wire:navigate>{{ __('Plan & usage') }}</flux:navlist.item>
                 </flux:navlist.group>
             </flux:navlist>

@@ -19,6 +19,9 @@ Route::prefix('app')->name('app.')->middleware(['auth', 'verified', 'adult'])->g
     Route::view('/', 'app.home')->name('home');
     Route::post('presence', PresenceController::class)->middleware('throttle:10,1')->name('presence');
     Volt::route('plan', 'app.plan')->name('plan');
+    Volt::route('catalog', 'app.catalog')->name('catalog');
+    Volt::route('catalog/{contact:slug}', 'app.catalog.show')->name('catalog.show');
+    Volt::route('contacts', 'app.contacts')->name('contacts');
 });
 
 // Settings stay reachable before verifying, so a mistyped email can be fixed.
