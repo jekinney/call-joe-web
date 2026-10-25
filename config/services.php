@@ -28,6 +28,13 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    // AI models (App\Support\Llm\GroqClient). Models themselves are chosen in /admin/models.
+    'groq' => [
+        'key' => env('GROQ_API_KEY', ''),
+        'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),
+        'timeout' => (int) env('GROQ_TIMEOUT', 30),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
