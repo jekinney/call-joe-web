@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -24,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $unread_count only with withUnreadCount()
  * @property-read Contact $contact
  * @property-read Relationship|null $relationship
+ * @property-read Memory|null $memory
  * @property-read User $user
  */
 class UserContact extends Model
@@ -55,6 +57,12 @@ class UserContact extends Model
     public function messages(): HasMany
     {
         return $this->hasMany(Message::class);
+    }
+
+    /** @return HasOne<Memory, $this> */
+    public function memory(): HasOne
+    {
+        return $this->hasOne(Memory::class);
     }
 
     /** @return HasMany<Conversation, $this> */

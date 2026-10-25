@@ -110,6 +110,7 @@ new #[Title('Texts')] class extends Component {
             <flux:heading>{{ $entry->displayName() }}</flux:heading>
             <flux:text size="sm">{{ __($entry->relationship?->label ?? 'Friend') }}</flux:text>
         </div>
+        <flux:button size="sm" variant="ghost" icon="light-bulb" class="ml-auto" :href="route('app.memory', $contact)" wire:navigate>{{ __('What they remember') }}</flux:button>
     </div>
 
     <div class="flex flex-1 flex-col gap-2 overflow-y-auto py-4" id="thread"

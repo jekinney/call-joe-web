@@ -23,6 +23,7 @@ Route::prefix('app')->name('app.')->middleware(['auth', 'verified', 'adult'])->g
     Volt::route('catalog/{contact:slug}', 'app.catalog.show')->name('catalog.show');
     Volt::route('contacts', 'app.contacts')->name('contacts');
     Volt::route('chat/{contact:slug}', 'app.chat')->name('chat');
+    Volt::route('memory/{contact:slug}', 'app.memory')->name('memory');
 });
 
 // Settings stay reachable before verifying, so a mistyped email can be fixed.

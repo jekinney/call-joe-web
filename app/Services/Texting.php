@@ -9,6 +9,7 @@ use App\Events\ContactReplyFailed;
 use App\Events\ContactTyping;
 use App\Exceptions\LlmException;
 use App\Jobs\SendContactReply;
+use App\Jobs\UpdateMemory;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
@@ -33,7 +34,12 @@ class Texting
 
     public const MAX_LENGTH = 2000;
 
-    public function __construct(private Entitlements $entitlements, private PromptBuilder $prompts, private LlmGateway $gateway) {}
+    public function __construct(
+        private Entitlements $entitlements,
+        private PromptBuilder $prompts,
+        private LlmGateway $gateway,
+        private MemoryWriter $memory,
+    ) {}
 
     /**
      * Sends the user's text and asks the contact to reply.
@@ -100,6 +106,7 @@ class Texting
             ContactMessaged::dispatch($user, $message);
         }
         $conversation->update(['last_message_at' => now()]);
+        UpdateMemory::afterQuiet($entry->id);
 
         return $bubbles;
     }
@@ -114,7 +121,7 @@ class Texting
             return $current;
         }
 
-        $snapshot = $this->prompts->build($entry);
+        $snapshot = $this->prompts->build($entry, $this->memory->notesFor($entry));
 
         return $entry->conversations()->create([
             'prompt_text' => $snapshot->text, 'prompt_hash' => $snapshot->hash, 'started_at' => now(), 'last_message_at' => now(),
