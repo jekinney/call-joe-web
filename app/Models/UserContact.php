@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -19,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property bool $is_active
  * @property Carbon $added_at
  * @property Carbon|null $deleted_at
+ * @property int|null $unread_count only with withUnreadCount()
  * @property-read Contact $contact
  * @property-read Relationship|null $relationship
  * @property-read User $user
@@ -46,6 +49,28 @@ class UserContact extends Model
     public function relationship(): BelongsTo
     {
         return $this->belongsTo(Relationship::class);
+    }
+
+    /** @return HasMany<Message, $this> */
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    /** @return HasMany<Conversation, $this> */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
+    }
+
+    /**
+     * Adds unread_count: texts from the contact the user hasn't seen yet (one query for the whole list).
+     *
+     * @param  Builder<UserContact>  $query
+     */
+    public function scopeWithUnreadCount(Builder $query): void
+    {
+        $query->withCount(['messages as unread_count' => fn ($q) => $q->where('sender', Message::FROM_CONTACT)->whereNull('read_at')]);
     }
 
     /** @return BelongsTo<User, $this> */

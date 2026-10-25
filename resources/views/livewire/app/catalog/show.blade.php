@@ -83,6 +83,7 @@ new #[Title('Contact')] class extends Component {
     <div class="flex max-w-sm flex-col gap-3">
         @if ($check === AddCheck::AlreadyAdded)
             <flux:text>{{ __(':name is on your phone.', ['name' => $contact->firstName()]) }}</flux:text>
+            <div><flux:button variant="primary" icon="chat-bubble-left-right" :href="route('app.chat', $contact)" wire:navigate>{{ __('Text :name', ['name' => $contact->firstName()]) }}</flux:button></div>
             <flux:select wire:model.live="relationshipId" :label="__(':name is my…', ['name' => $contact->firstName()])">
                 @foreach ($relationships as $relationship)
                     <flux:select.option :value="$relationship->id">{{ __($relationship->label) }}</flux:select.option>

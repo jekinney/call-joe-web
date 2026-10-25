@@ -20,7 +20,7 @@ new #[Title('My contacts')] class extends Component {
         $user = auth()->user();
 
         return [
-            'entries' => $user->userContacts()->with(['contact', 'relationship'])->get(),
+            'entries' => $user->userContacts()->with(['contact', 'relationship'])->withUnreadCount()->get(),
             'count' => $phonebook->count($user),
             'limit' => $phonebook->limit($user),
         ];
@@ -38,17 +38,25 @@ new #[Title('My contacts')] class extends Component {
 
     @forelse ($entries as $entry)
         <div class="flex items-center justify-between gap-4 border-b border-zinc-200 pb-4 dark:border-zinc-700" wire:key="entry-{{ $entry->id }}">
-            <a href="{{ route('app.catalog.show', $entry->contact) }}" class="flex items-center gap-3" wire:navigate>
+            <a href="{{ route('app.chat', $entry->contact) }}" class="flex items-center gap-3" wire:navigate>
                 <flux:avatar :src="$entry->contact->avatarUrl()" :name="$entry->contact->name" />
                 <div>
-                    <flux:heading>{{ $entry->displayName() }}</flux:heading>
+                    <flux:heading>
+                        {{ $entry->displayName() }}
+                        @if ($entry->unread_count)
+                            <flux:badge color="emerald" size="sm">{{ trans_choice(':count new|:count new', $entry->unread_count, ['count' => $entry->unread_count]) }}</flux:badge>
+                        @endif
+                    </flux:heading>
                     <flux:text size="sm">{{ __($entry->relationship?->label ?? 'Friend') }} · {{ $entry->contact->tagline }}</flux:text>
                 </div>
             </a>
-            <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="remove({{ $entry->id }})"
-                wire:confirm="{{ __('Remove :name from your phone? Everything you shared is kept, and comes back if you add them again.', ['name' => $entry->displayName()]) }}">
-                {{ __('Remove') }}
-            </flux:button>
+            <div class="flex gap-1">
+                <flux:button size="sm" variant="ghost" :href="route('app.catalog.show', $entry->contact)" wire:navigate>{{ __('Profile') }}</flux:button>
+                <flux:button size="sm" variant="ghost" icon="x-mark" wire:click="remove({{ $entry->id }})"
+                    wire:confirm="{{ __('Remove :name from your phone? Everything you shared is kept, and comes back if you add them again.', ['name' => $entry->displayName()]) }}">
+                    {{ __('Remove') }}
+                </flux:button>
+            </div>
         </div>
     @empty
         <flux:text>{{ __('No one yet.') }} <a href="{{ route('app.catalog') }}" class="underline" wire:navigate>{{ __('Browse the catalog') }}</a>.</flux:text>

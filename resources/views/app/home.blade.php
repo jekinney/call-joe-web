@@ -1,5 +1,5 @@
 <x-layouts.app :title="__('Home')">
-    @php($entries = auth()->user()->userContacts()->with('contact')->get())
+    @php($entries = auth()->user()->userContacts()->with('contact')->withUnreadCount()->get())
 
     <div class="flex h-full w-full flex-1 flex-col gap-6">
         <flux:heading size="xl">{{ __('Hi, :name', ['name' => auth()->user()->preferredName()]) }}</flux:heading>
@@ -10,8 +10,11 @@
         @else
             <div class="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-6">
                 @foreach ($entries as $entry)
-                    <a href="{{ route('app.catalog.show', $entry->contact) }}" class="flex flex-col items-center gap-2 text-center" wire:navigate>
+                    <a href="{{ route('app.chat', $entry->contact) }}" class="relative flex flex-col items-center gap-2 text-center" wire:navigate>
                         <flux:avatar size="xl" :src="$entry->contact->avatarUrl()" :name="$entry->contact->name" />
+                        @if ($entry->unread_count)
+                            <span class="absolute right-2 top-0 rounded-full bg-emerald-600 px-1.5 text-xs text-white" data-unread>{{ $entry->unread_count }}</span>
+                        @endif
                         <span class="text-sm">{{ $entry->displayName() }}</span>
                     </a>
                 @endforeach
