@@ -19,13 +19,21 @@ class Presence
     /** Check-ins closer together than this don't write to the database again. */
     public const WRITE_EVERY_SECONDS = 30;
 
-    public function touch(User $user): void
+    /**
+     * Records a check-in. Returns how many seconds they'd been away if they were offline until now (null if they
+     * were already online, or this is their very first visit).
+     */
+    public function touch(User $user): ?int
     {
-        if ($user->last_seen_at && $user->last_seen_at->gt(now()->subSeconds(self::WRITE_EVERY_SECONDS))) {
-            return;
+        $last = $user->last_seen_at;
+        if ($last && $last->gt(now()->subSeconds(self::WRITE_EVERY_SECONDS))) {
+            return null;
         }
 
+        $away = $last && ! $this->isOnline($user) ? (int) $last->diffInSeconds(now(), true) : null;
         $user->forceFill(['last_seen_at' => now()])->saveQuietly();
+
+        return $away;
     }
 
     public function isOnline(User $user): bool

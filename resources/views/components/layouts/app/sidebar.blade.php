@@ -22,6 +22,13 @@
 
             <flux:spacer />
 
+            {{-- Shown only once the browser offers to install the app (resources/js/pwa.js). --}}
+            <div data-install-app hidden>
+                <flux:navlist variant="outline">
+                    <flux:navlist.item icon="arrow-down-tray" as="button">{{ __('Install app') }}</flux:navlist.item>
+                </flux:navlist>
+            </div>
+
             @can('admin')
                 <flux:navlist variant="outline">
                     <flux:navlist.item icon="shield-check" :href="route('admin.home')" wire:navigate>{{ __('Admin') }}</flux:navlist.item>

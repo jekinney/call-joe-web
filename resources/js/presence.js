@@ -10,7 +10,10 @@ let heartbeat = null;
 function checkIn() {
     const url = meta('presence-url');
     if (!url || document.visibilityState === 'hidden') return;
-    fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': meta('csrf-token') ?? '', Accept: 'application/json' } }).catch(() => {});
+    fetch(url, { method: 'POST', headers: { 'X-CSRF-TOKEN': meta('csrf-token') ?? '', Accept: 'application/json' } })
+        .then((response) => (response.status === 200 ? response.json() : null))
+        .then((data) => data?.welcome && showNotice(data.welcome)) // back after a while: "Welcome back! Maya texted you."
+        .catch(() => {});
 }
 
 // A small notice in the corner, gone after a few seconds.

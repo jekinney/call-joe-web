@@ -9,6 +9,9 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
+// Shown by the service worker when there's no connection (cached when the app is installed).
+Route::view('offline', 'offline')->name('offline');
+
 // "Home" after logging in: admins to /admin, everyone else to /app.
 Route::get('home', HomeController::class)
     ->middleware(['auth', 'verified'])
