@@ -4,8 +4,10 @@ namespace Tests;
 
 use App\Contracts\ImageGenerator;
 use App\Contracts\LlmClient;
+use App\Contracts\PaymentGateway;
 use App\Contracts\VoiceProvider;
 use App\Services\LlmProviders;
+use App\Support\Billing\FakePaymentGateway;
 use App\Support\Images\FakeImageGenerator;
 use App\Support\Llm\FakeLlmClient;
 use App\Support\Voice\FakeVoiceProvider;
@@ -20,6 +22,8 @@ abstract class TestCase extends BaseTestCase
 
     protected FakeImageGenerator $images;
 
+    protected FakePaymentGateway $payments;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -33,5 +37,7 @@ abstract class TestCase extends BaseTestCase
         $this->app->instance(VoiceProvider::class, $this->voice);
         $this->images = new FakeImageGenerator;
         $this->app->instance(ImageGenerator::class, $this->images);
+        $this->payments = new FakePaymentGateway;
+        $this->app->instance(PaymentGateway::class, $this->payments);
     }
 }

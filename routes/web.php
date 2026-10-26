@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BraintreeWebhookController;
 use App\Http\Controllers\DeclineCallController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ImageController;
@@ -14,6 +15,9 @@ Route::get('/', function () {
 
 // The voice service's call reports (checked by a secret header; no session or CSRF token).
 Route::post('webhooks/voice', VoiceWebhookController::class)->name('webhooks.voice');
+
+// Braintree's payment webhooks (checked by Braintree's signature; no session or CSRF token).
+Route::match(['get', 'post'], 'webhooks/braintree', BraintreeWebhookController::class)->name('webhooks.braintree');
 
 // Shown by the service worker when there's no connection (cached when the app is installed).
 Route::view('offline', 'offline')->name('offline');

@@ -39,6 +39,8 @@ Then open http://localhost:8090.
 
 **A contact's brain** is the model that writes their texts. Whoever creates the contact chooses it, in `/admin/contacts` (a cheap Gemini for a lower-tier contact, Grok or Claude for a better one, with prices shown), and only an admin can change it: users never see or set it. A contact can't be published without one, and contacts without one use the default (Grok).
 
+**Paid plans** are sold through Braintree: the card form is Braintree's own (card details never touch our server), a subscription puts the user on the plan until the end of the period they paid for (plus 2 days), and Braintree's webhooks (`/webhooks/braintree`) move that date on at each renewal. A failed card or a missed webhook ends on Free, never on free paid service. Add your Braintree sandbox keys and plan id to `.env` (see `.env.example`); until then the plan page says upgrading is coming soon.
+
 **Voice calls** use Gemini Live through our own Pipecat service in `voice/` (one Gemini key, no cloned voices for now): a contact's voice is one of Gemini's built-in voices, picked in `/admin/contacts`. Start it with the steps in `voice/README.md` before making a call.
 
 Contacts keep living while you're away: the scheduler moves each one through their relationship's worry stages and plans texts and calls (`App\Services\Outreach`). Calls ring your open page or become missed calls; texts are written only when you're online to read them, with their original times. Try it with `./vendor/bin/sail artisan outreach:run`.

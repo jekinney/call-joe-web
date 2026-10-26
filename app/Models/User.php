@@ -26,6 +26,7 @@ use Illuminate\Support\Str;
  * @property Carbon|null $last_seen_at
  * @property int|null $plan_id
  * @property Carbon|null $plan_expires_at
+ * @property string|null $braintree_customer_id
  * @property Carbon|null $away_until away mode: contacts know and don't worry until then
  * @property string|null $away_note e.g. "On vacation in Maine"
  * @property array<string, mixed>|null $flags strikes (blocked texts), suspension_reason, suspended_by

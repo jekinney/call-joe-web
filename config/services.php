@@ -66,6 +66,17 @@ return [
         'secret' => env('VOICE_SECRET', ''),
     ],
 
+    // Paid plans (App\Support\Billing\BraintreeClient): use sandbox keys while developing. `plans` maps a plan's slug to
+    // its plan id in the Braintree control panel (a monthly plan priced like the Paid plan), unless the plan has its own
+    // braintree_plan_id.
+    'braintree' => [
+        'environment' => env('BRAINTREE_ENV', 'sandbox'),
+        'merchant_id' => env('BRAINTREE_MERCHANT_ID', ''),
+        'public_key' => env('BRAINTREE_PUBLIC_KEY', ''),
+        'private_key' => env('BRAINTREE_PRIVATE_KEY', ''),
+        'plans' => ['paid' => env('BRAINTREE_PLAN_PAID', '')],
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

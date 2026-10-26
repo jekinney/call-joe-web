@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\ImageGenerator;
+use App\Contracts\PaymentGateway;
 use App\Contracts\VoiceProvider;
 use App\Enums\Feature;
 use App\Http\Middleware\EnsureNotSuspended;
@@ -10,6 +11,7 @@ use App\Http\Middleware\EnsureTermsAccepted;
 use App\Models\User;
 use App\Services\Entitlements;
 use App\Services\LlmProviders;
+use App\Support\Billing\BraintreeClient;
 use App\Support\Images\XaiImageClient;
 use App\Support\Voice\PipecatClient;
 use Illuminate\Support\Facades\Gate;
@@ -24,6 +26,14 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(Entitlements::class);
+
+        // Payments. Tests swap in App\Support\Billing\FakePaymentGateway (tests/TestCase.php).
+        $this->app->singleton(PaymentGateway::class, fn () => new BraintreeClient([
+            'environment' => (string) config('services.braintree.environment'),
+            'merchantId' => (string) config('services.braintree.merchant_id'),
+            'publicKey' => (string) config('services.braintree.public_key'),
+            'privateKey' => (string) config('services.braintree.private_key'),
+        ]));
 
         // Voice calls. Tests swap in App\Support\Voice\FakeVoiceProvider (tests/TestCase.php).
         $this->app->singleton(VoiceProvider::class, fn () => new PipecatClient(
