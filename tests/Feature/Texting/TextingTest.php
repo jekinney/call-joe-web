@@ -109,7 +109,7 @@ it('starts a new conversation with a fresh prompt after a long quiet spell', fun
 it('marks the text when the contact cannot answer, says so live, and retries without counting again', function () {
     Event::fake([ContactReplyFailed::class]);
     Llm::query()->update(['fallback_id' => null]);
-    $this->llm->failFor('llama-3.1-8b-instant');
+    $this->llm->failAll();
 
     $message = texting()->send($this->user, $this->entry, 'Hello?');
 

@@ -11,6 +11,7 @@ use App\Models\Relationship;
 use App\Models\User;
 use App\Services\Calling;
 use App\Services\Entitlements;
+use App\Services\LlmGateway;
 use App\Services\MemoryWriter;
 use App\Services\Phonebook;
 use Illuminate\Support\Facades\Queue;
@@ -37,8 +38,8 @@ it('sets up a call: a one-off assistant with the prompt, memory, voice, time lim
 
     expect($call->status)->toBe(Call::STARTING)
         ->and($call->max_seconds)->toBe(600) // Free: 10 minutes a month, none used
-        ->and($assistant['model']['provider'])->toBe('groq')
-        ->and($assistant['model']['model'])->toBe('llama-3.1-8b-instant') // no voice model yet: the chat model
+        ->and($assistant['model']['provider'])->toBe('google') // Vapi's name for Gemini
+        ->and($assistant['model']['model'])->toBe('gemini-3.5-flash-lite') // the starting model for calls
         ->and($assistant['model']['messages'][0]['content'])->toContain("You are Jamie's sister.")->toContain('Biscuit')
         ->and(hash('sha256', $assistant['model']['messages'][0]['content']))->toBe($call->prompt_hash)
         ->and($assistant['voice'])->toBe(['provider' => '11labs', 'voiceId' => 'maya-voice'])
@@ -49,12 +50,23 @@ it('sets up a call: a one-off assistant with the prompt, memory, voice, time lim
         ->and(calling()->publicKey())->toBe('pk_fake');
 });
 
-it('uses a voice model when one is set up', function () {
-    Llm::create(['model_id' => 'llama-voice', 'label' => 'Voice', 'purpose' => 'voice']);
+it('uses the voice model set up in admin, on any provider', function () {
+    Llm::create(['provider' => 'xai', 'model_id' => 'grok-voice', 'label' => 'Voice', 'purpose' => 'voice']);
 
     $call = calling()->start($this->user, $this->entry);
 
-    expect($this->voice->assistants[$call->vapi_assistant_id]['model']['model'])->toBe('llama-voice');
+    expect($this->voice->assistants[$call->vapi_assistant_id]['model']['model'])->toBe('grok-voice')
+        ->and($this->voice->assistants[$call->vapi_assistant_id]['model']['provider'])->toBe('xai');
+});
+
+it('uses the texting model when no model is set up for calls', function () {
+    Llm::where('purpose', 'voice')->delete();
+    app(LlmGateway::class)->forgetModels();
+
+    $call = calling()->start($this->user, $this->entry);
+
+    expect($this->voice->assistants[$call->vapi_assistant_id]['model']['model'])->toBe('claude-haiku-5-5')
+        ->and($this->voice->assistants[$call->vapi_assistant_id]['model']['provider'])->toBe('anthropic');
 });
 
 it('limits a call to the call time left, and no more than 30 minutes', function () {

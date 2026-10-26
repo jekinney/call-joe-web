@@ -90,7 +90,7 @@ class Calling
                 'name' => "Call Joe call {$call->id}",
                 'firstMessageMode' => 'assistant-speaks-first-with-model-generated-message',
                 'model' => [
-                    'provider' => $model->provider,
+                    'provider' => $model->provider->vapiName(),
                     'model' => $model->model_id,
                     'messages' => [['role' => 'system', 'content' => $prompt]],
                     'temperature' => 0.8,

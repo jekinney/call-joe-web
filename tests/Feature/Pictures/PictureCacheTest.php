@@ -58,12 +58,12 @@ it('boils a scene down to a tidy signature', function () {
 
     expect(pictureCache()->signature(mayaFor(), 'what I had for lunch'))
         ->toBe('{"action":"","outfit":"","setting":"the cafe","subject":"lunch","time_of_day":""}')
-        ->and($this->llm->calls[0]['model'])->toBe('llama-3.1-8b-instant')
+        ->and($this->llm->calls[0]['model'])->toBe('gemini-3.5-flash-lite')
         ->and($this->llm->calls[0]['options'])->toBe(['max_tokens' => 120, 'temperature' => 0.0]);
 });
 
 it('falls back to a word list when the model can\'t say', function (?string $answer) {
-    $answer === null ? $this->llm->failFor('llama-3.1-8b-instant') : $this->llm->reply($answer, $answer);
+    $answer === null ? $this->llm->failAll() : $this->llm->reply($answer, $answer);
 
     expect(pictureCache()->signature(mayaFor(), 'My big salad at the cafe!'))->toBe('words:big cafe salad')
         ->and(pictureCache()->signature(mayaFor(), 'the cafe, my BIG salad'))->toBe('words:big cafe salad');

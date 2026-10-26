@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Contracts\LlmClient;
 use App\Enums\LlmPurpose;
 use App\Exceptions\LlmException;
 use App\Models\Contact;
@@ -14,15 +13,16 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * The one way the app asks an AI anything. It picks the model (by purpose, and the user's plan: small or large),
- * logs every attempt with tokens, time and cost (llm_calls), and if the provider fails in a way worth retrying,
- * asks the model's fallback once instead.
+ * sends the question to that model's provider (Claude, Gemini, Grok or Groq: App\Services\LlmProviders), logs every
+ * attempt with tokens, time and cost (llm_calls), and if the provider fails in a way worth retrying (or has no key),
+ * asks the model's fallback once instead, usually on another provider.
  */
 class LlmGateway
 {
     /** How long the chosen models are remembered; admin changes clear it straight away. */
     public const CACHE_SECONDS = 60;
 
-    public function __construct(private LlmClient $client, private Entitlements $entitlements) {}
+    public function __construct(private LlmProviders $providers, private Entitlements $entitlements) {}
 
     /** The active model for this purpose and user (their plan's tier first, then any-tier models). */
     public function modelFor(LlmPurpose $purpose, ?User $user = null): Llm
@@ -47,18 +47,19 @@ class LlmGateway
     }
 
     /**
-     * Asks one specific model (and its fallback if it fails): used by chat(), and by the admin's Test button.
+     * Asks one specific model (and its fallback if it fails): used by chat(), and by the admin's Test button (which
+     * asks without the fallback, so a problem shows instead of being covered up).
      *
      * @param  list<array{role: string, content: string}>  $messages
      * @param  array{max_tokens?: int, temperature?: float}  $options
      */
-    public function ask(Llm $model, LlmPurpose $purpose, array $messages, ?User $user = null, ?Contact $contact = null, array $options = []): LlmResponse
+    public function ask(Llm $model, LlmPurpose $purpose, array $messages, ?User $user = null, ?Contact $contact = null, array $options = [], bool $withFallback = true): LlmResponse
     {
         try {
             return $this->attempt($model, $purpose, $messages, $user, $contact, $options, 'ok');
         } catch (LlmException $e) {
             $fallback = $model->fallback;
-            if (! $e->retryable || ! $fallback || ! $fallback->is_active || $fallback->is($model)) {
+            if (! $withFallback || ! $e->retryable || ! $fallback || ! $fallback->is_active || $fallback->is($model)) {
                 throw $e;
             }
 
@@ -84,7 +85,9 @@ class LlmGateway
         $log = ['user_id' => $user?->id, 'contact_id' => $contact?->id, 'llm_model_id' => $model->id, 'model' => $model->model_id, 'purpose' => $purpose];
 
         try {
-            $response = $this->client->chat($model->model_id, $messages, $options + ['max_tokens' => $model->max_tokens]);
+            $response = $this->providers->client($model->provider)->chat(
+                $model->model_id, $messages, $options + ['max_tokens' => $model->max_tokens] + ($model->fast_thinking ? ['fast' => true] : []),
+            );
         } catch (LlmException $e) {
             LlmCall::create($log + ['status' => 'error', 'error' => mb_substr($e->getMessage(), 0, 300), 'latency_ms' => $this->msSince($started)]);
 

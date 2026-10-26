@@ -28,7 +28,26 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
-    // AI models (App\Support\Llm\GroqClient). Models themselves are chosen in /admin/models.
+    // AI providers (App\Enums\LlmProvider, App\Services\LlmProviders). Which model does which job is chosen in
+    // /admin/models; each model belongs to one of these providers, whose key is set here.
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY', ''),
+        'base_url' => env('ANTHROPIC_BASE_URL', ''),
+        'timeout' => (int) env('ANTHROPIC_TIMEOUT', 30),
+    ],
+
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY', ''),
+        'base_url' => env('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+        'timeout' => (int) env('GEMINI_TIMEOUT', 30),
+    ],
+
+    'xai' => [
+        'key' => env('XAI_API_KEY', ''),
+        'base_url' => env('XAI_BASE_URL', 'https://api.x.ai/v1'),
+        'timeout' => (int) env('XAI_TIMEOUT', 30),
+    ],
+
     'groq' => [
         'key' => env('GROQ_API_KEY', ''),
         'base_url' => env('GROQ_BASE_URL', 'https://api.groq.com/openai/v1'),

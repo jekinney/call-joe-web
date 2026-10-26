@@ -34,6 +34,8 @@ Then open http://localhost:8090.
 | Queue | Background jobs and broadcasts | (no port) |
 | Scheduler | Contacts reaching out on their own (`outreach:run`, every minute) | (no port) |
 
+**The brain:** every AI job (texting, memory notes, safety checks, picture scenes, calls) runs on a model you pick per job in `/admin/models`: Claude (through Anthropic's PHP SDK), Gemini, Grok, or Groq, each with its own key in `.env` and a fallback on another provider. Texting starts on Claude (Haiku on Free, Sonnet on Paid), calls on Gemini 3.5 Flash-Lite (about 0.9 s a reply). A model's "Answer fast" switch turns its thinking down (Claude: low effort; Gemini: thinking off).
+
 Contacts keep living while you're away: the scheduler moves each one through their relationship's worry stages and plans texts and calls (`App\Services\Outreach`). Calls ring your open page or become missed calls; texts are written only when you're online to read them, with their original times. Try it with `./vendor/bin/sail artisan outreach:run`.
 
 Safety runs on every text, reply, reach-out, call and (later) picture prompt (`App\Services\Moderator`): fast word patterns, then a small AI classifier only when something looks risky. Anything sexual involving minors is blocked and counted as a strike; talk of self-harm or hurting others puts the contact on a crisis path that points to 988 or 911. Admins review blocked and flagged items and suspend accounts at `/admin/moderation`. The Terms, Privacy Policy and AI disclosure live at `/terms`, `/privacy` and `/ai` (drafts, to be reviewed by counsel); bump `terms_version` in `config/legal.php` to ask everyone to accept a change.

@@ -161,7 +161,7 @@ it('stops at a text the AI can\'t write, keeping the order for next time', funct
     goOnline();
     $first = reachOut($this->mom, 'text', 3);
     $second = reachOut($this->mom, 'text', 2);
-    $this->llm->failFor('llama-3.3-70b-versatile')->failFor('llama-3.1-8b-instant');
+    $this->llm->failAll();
 
     app(Outreach::class)->deliverDue($this->user);
 

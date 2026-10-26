@@ -17,6 +17,8 @@ class FakeLlmClient implements LlmClient
     /** @var array<string, LlmException> */
     private array $failures = [];
 
+    private ?LlmException $failEverything = null;
+
     /** @var list<array{model: string, messages: list<array{role: string, content: string}>, options: array<string, mixed>}> */
     public array $calls = [];
 
@@ -36,10 +38,21 @@ class FakeLlmClient implements LlmClient
         return $this;
     }
 
+    /** Make calls to every model fail: no provider answers, whatever the model and its fallback are. */
+    public function failAll(bool $retryable = true, string $message = 'The fake provider is down.'): static
+    {
+        $this->failEverything = new LlmException($message, $retryable);
+
+        return $this;
+    }
+
     public function chat(string $model, array $messages, array $options = []): LlmResponse
     {
         $this->calls[] = ['model' => $model, 'messages' => $messages, 'options' => $options];
 
+        if ($this->failEverything) {
+            throw $this->failEverything;
+        }
         if (isset($this->failures[$model])) {
             throw $this->failures[$model];
         }

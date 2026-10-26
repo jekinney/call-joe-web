@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\LlmProvider;
 use App\Enums\LlmPurpose;
 use App\Exceptions\LlmException;
 use App\Models\Llm;
@@ -8,6 +9,7 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\Entitlements;
 use App\Services\LlmGateway;
+use Illuminate\Support\Facades\Http;
 use Livewire\Volt\Volt;
 
 // /admin/models: manage the AI models without a deploy.
@@ -32,41 +34,62 @@ it('lists the models by purpose with last week\'s usage', function () {
 
     $this->actingAs($this->admin)->get(route('admin.models'))
         ->assertOk()
-        ->assertSee('Texting')->assertSee('Memory notes')
-        ->assertSee('Llama 3.3 70B')->assertSee('llama-3.1-8b-instant')
-        ->assertSee('If it fails: Llama 3.1 8B (fast)')
+        ->assertSee('Texting')->assertSee('Memory notes')->assertSee('Picture scenes')->assertSee('Voice calls')
+        ->assertSee('Claude Sonnet 5.5')->assertSee('claude-haiku-5-5')->assertSee('gemini-3.5-flash-lite')->assertSee('grok-4.20-0309-non-reasoning')
+        ->assertSee('If it fails: Gemini 3.8 Flash (backup)')
         ->assertSee('Last 7 days: 2 calls, 1,000 tokens, $0.0025, 1 errors')
-        ->assertSee('No models yet.'); // Voice calls has none
+        ->assertSee('Backup')->assertSee('Fast')
+        ->assertDontSee('No models yet.');
 });
 
-it('warns when no Groq key is set', function () {
-    config(['services.groq.key' => '']);
-    $this->actingAs($this->admin)->get(route('admin.models'))->assertSee('No Groq API key is set');
+it('shows which providers have a key', function () {
+    config(['services.anthropic.key' => 'sk-ant-test', 'services.gemini.key' => '', 'services.xai.key' => 'xai-test', 'services.groq.key' => '']);
 
-    config(['services.groq.key' => 'gsk_test']);
-    $this->actingAs($this->admin)->get(route('admin.models'))->assertDontSee('No Groq API key is set');
+    $this->actingAs($this->admin)->get(route('admin.models'))
+        ->assertSee('Claude (Anthropic): key set')
+        ->assertSee('Gemini (Google): no key (GEMINI_API_KEY)')
+        ->assertSee('Grok (xAI): key set')
+        ->assertSee('Groq: no key (GROQ_API_KEY)');
 });
 
 it('adds a model, and the gateway uses it right away', function () {
-    $small = Llm::where('model_id', 'llama-3.1-8b-instant')->first();
-    // No voice model yet: that empty answer is now cached, and saving must clear it.
+    $fast = Llm::where('model_id', 'gemini-3.5-flash-lite')->where('purpose', 'voice')->first();
+    // Take the voice model away: that empty answer is now cached, and saving must clear it.
+    $fast->delete();
+    app(LlmGateway::class)->forgetModels();
     expect(fn () => app(LlmGateway::class)->modelFor(LlmPurpose::Voice))->toThrow(LlmException::class);
 
     modelsPage()
         ->call('create')
-        ->set('model_id', 'llama-voice-4')
-        ->set('label', 'Llama Voice')
+        ->assertSet('provider', 'anthropic')
+        ->set('provider', 'xai')
+        ->set('model_id', 'grok-4.20-0309-non-reasoning')
+        ->set('label', 'Grok for calls')
         ->set('purpose', 'voice')
-        ->set('fallback_id', (string) $small->id)
-        ->set('input_cents_per_mtok', '20')
-        ->set('output_cents_per_mtok', '20')
+        ->set('fallback_id', (string) Llm::where('plan_tier', 'small')->value('id'))
+        ->set('fast_thinking', true)
+        ->set('input_cents_per_mtok', '125')
+        ->set('output_cents_per_mtok', '250')
         ->set('max_tokens', 256)
         ->call('save')
         ->assertHasNoErrors()
         ->assertDispatched('model-saved')
-        ->assertSee('Llama Voice');
+        ->assertSee('Grok for calls');
 
-    expect(app(LlmGateway::class)->modelFor(LlmPurpose::Voice)->model_id)->toBe('llama-voice-4');
+    $voice = app(LlmGateway::class)->modelFor(LlmPurpose::Voice);
+    expect($voice->only(['provider', 'model_id', 'fast_thinking']))->toBe(['provider' => LlmProvider::Xai, 'model_id' => 'grok-4.20-0309-non-reasoning', 'fast_thinking' => true]);
+});
+
+it('suggests the models a provider offers while adding one', function () {
+    config(['services.xai.key' => 'xai-test', 'services.xai.base_url' => 'https://xai.test/v1']);
+    Http::fake(['xai.test/v1/models' => Http::response(['data' => [['id' => 'grok-4.7'], ['id' => 'grok-4.20-0309-non-reasoning']]])]);
+
+    modelsPage()->call('create')
+        ->assertSee('6 models to pick from')->assertSee('value="claude-sonnet-5-5"', false) // Claude's are built in
+        ->set('provider', 'xai')
+        ->assertSee('2 models to pick from')->assertSee('value="grok-4.7"', false)
+        ->set('provider', 'groq') // no key, so nothing to ask
+        ->assertDontSee('models to pick from');
 });
 
 it('edits a model, loading its current values', function () {
@@ -74,14 +97,17 @@ it('edits a model, loading its current values', function () {
 
     modelsPage()
         ->call('edit', $large->id)
-        ->assertSet('model_id', 'llama-3.3-70b-versatile')
+        ->assertSet('provider', 'anthropic')
+        ->assertSet('model_id', 'claude-sonnet-5-5')
         ->assertSet('plan_tier', 'large')
         ->assertSet('purpose', 'chat')
-        ->set('model_id', 'llama-4-maverick')
+        ->assertSet('fast_thinking', true)
+        ->set('model_id', 'claude-opus-5-5')
+        ->set('fast_thinking', false)
         ->call('save')
         ->assertHasNoErrors();
 
-    expect($large->refresh()->model_id)->toBe('llama-4-maverick');
+    expect($large->refresh()->only(['model_id', 'fast_thinking']))->toBe(['model_id' => 'claude-opus-5-5', 'fast_thinking' => false]);
 });
 
 it('validates the form, and a model cannot fall back to itself', function () {
@@ -89,6 +115,7 @@ it('validates the form, and a model cannot fall back to itself', function () {
 
     modelsPage()
         ->call('edit', $large->id)
+        ->set('provider', 'openai')
         ->set('model_id', '')
         ->set('purpose', 'dreams')
         ->set('plan_tier', 'huge')
@@ -96,7 +123,7 @@ it('validates the form, and a model cannot fall back to itself', function () {
         ->set('input_cents_per_mtok', '-1')
         ->set('max_tokens', 5)
         ->call('save')
-        ->assertHasErrors(['model_id', 'purpose', 'plan_tier', 'fallback_id', 'input_cents_per_mtok', 'max_tokens']);
+        ->assertHasErrors(['provider', 'model_id', 'purpose', 'plan_tier', 'fallback_id', 'input_cents_per_mtok', 'max_tokens']);
 });
 
 it('turns a model off and on, and the gateway follows', function () {
@@ -105,20 +132,21 @@ it('turns a model off and on, and the gateway follows', function () {
     app(Entitlements::class)->assignPlan($paid, Plan::where('slug', 'paid')->first(), null);
 
     modelsPage()->call('toggle', $large->id)->assertSee('Turn on');
-    expect(app(LlmGateway::class)->modelFor(LlmPurpose::Chat, $paid)->model_id)->toBe('llama-3.1-8b-instant');
+    expect(app(LlmGateway::class)->modelFor(LlmPurpose::Chat, $paid)->model_id)->toBe('claude-haiku-5-5');
 
     modelsPage()->call('toggle', $large->id);
-    expect(app(LlmGateway::class)->modelFor(LlmPurpose::Chat, $paid)->model_id)->toBe('llama-3.3-70b-versatile');
+    expect(app(LlmGateway::class)->modelFor(LlmPurpose::Chat, $paid)->model_id)->toBe('claude-sonnet-5-5');
 });
 
-it('tests a model and shows its answer, or the error', function () {
-    $small = Llm::where('model_id', 'llama-3.1-8b-instant')->first();
+it('tests a model on its own and shows its answer, or the error', function () {
+    $small = Llm::where('plan_tier', 'small')->first();
     $this->llm->reply('Hello there, friend!');
 
-    modelsPage()->call('test', $small->id)->assertSee('“Hello there, friend!” from llama-3.1-8b-instant');
+    modelsPage()->call('test', $small->id)->assertSee('“Hello there, friend!” from claude-haiku-5-5');
 
-    $this->llm->failFor('llama-3.1-8b-instant', retryable: false, message: 'Invalid API Key');
-    modelsPage()->call('test', $small->id)->assertSee('Invalid API Key');
+    // Even though it has a backup, the test shows the problem instead of covering it up.
+    $this->llm->failFor('claude-haiku-5-5', retryable: true, message: 'Invalid API Key');
+    modelsPage()->call('test', $small->id)->assertSee('Invalid API Key')->assertDontSee('Hello there');
 });
 
 it('is linked from the admin sidebar', function () {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\LlmProvider;
 use App\Enums\LlmPurpose;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,12 +11,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * An AI model contacts can think with, managed in /admin/models.
  *
  * @property int $id
- * @property string $provider
+ * @property LlmProvider $provider
  * @property string $model_id
  * @property string $label
  * @property LlmPurpose $purpose
- * @property string|null $plan_tier
+ * @property string|null $plan_tier small | large (the plan's llm_tier), backup (only ever a fallback), or null for any
  * @property bool $is_active
+ * @property bool $fast_thinking think as little as the model allows (Claude: low effort; Gemini: no thinking)
  * @property int|null $fallback_id
  * @property string $input_cents_per_mtok
  * @property string $output_cents_per_mtok
@@ -28,17 +30,19 @@ class Llm extends Model
     protected $table = 'llm_models';
 
     protected $fillable = [
-        'provider', 'model_id', 'label', 'purpose', 'plan_tier', 'is_active', 'fallback_id',
+        'provider', 'model_id', 'label', 'purpose', 'plan_tier', 'is_active', 'fast_thinking', 'fallback_id',
         'input_cents_per_mtok', 'output_cents_per_mtok', 'max_tokens', 'sort',
     ];
 
-    protected $attributes = ['provider' => 'groq', 'is_active' => true, 'max_tokens' => 1024, 'sort' => 0];
+    protected $attributes = ['provider' => 'anthropic', 'is_active' => true, 'fast_thinking' => false, 'max_tokens' => 1024, 'sort' => 0];
 
     protected function casts(): array
     {
         return [
+            'provider' => LlmProvider::class,
             'purpose' => LlmPurpose::class,
             'is_active' => 'boolean',
+            'fast_thinking' => 'boolean',
             'max_tokens' => 'integer',
             'input_cents_per_mtok' => 'decimal:2',
             'output_cents_per_mtok' => 'decimal:2',

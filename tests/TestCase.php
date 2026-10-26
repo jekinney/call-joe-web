@@ -5,6 +5,7 @@ namespace Tests;
 use App\Contracts\ImageGenerator;
 use App\Contracts\LlmClient;
 use App\Contracts\VoiceProvider;
+use App\Services\LlmProviders;
 use App\Support\Images\FakeImageGenerator;
 use App\Support\Llm\FakeLlmClient;
 use App\Support\Voice\FakeVoiceProvider;
@@ -27,6 +28,7 @@ abstract class TestCase extends BaseTestCase
         Http::preventStrayRequests();
         $this->llm = new FakeLlmClient;
         $this->app->instance(LlmClient::class, $this->llm);
+        $this->app->make(LlmProviders::class)->fake($this->llm); // one fake answers Claude, Gemini, Grok and Groq alike
         $this->voice = new FakeVoiceProvider;
         $this->app->instance(VoiceProvider::class, $this->voice);
         $this->images = new FakeImageGenerator;

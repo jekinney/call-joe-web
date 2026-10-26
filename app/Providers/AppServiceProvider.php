@@ -3,15 +3,14 @@
 namespace App\Providers;
 
 use App\Contracts\ImageGenerator;
-use App\Contracts\LlmClient;
 use App\Contracts\VoiceProvider;
 use App\Enums\Feature;
 use App\Http\Middleware\EnsureNotSuspended;
 use App\Http\Middleware\EnsureTermsAccepted;
 use App\Models\User;
 use App\Services\Entitlements;
+use App\Services\LlmProviders;
 use App\Support\Images\TogetherImageClient;
-use App\Support\Llm\GroqClient;
 use App\Support\Voice\VapiClient;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -42,12 +41,9 @@ class AppServiceProvider extends ServiceProvider
             (int) config('services.together.timeout'),
         ));
 
-        // The AI provider. Tests swap in App\Support\Llm\FakeLlmClient (tests/TestCase.php).
-        $this->app->singleton(LlmClient::class, fn () => new GroqClient(
-            (string) config('services.groq.key'),
-            (string) config('services.groq.base_url'),
-            (int) config('services.groq.timeout'),
-        ));
+        // The AI providers (Claude, Gemini, Grok, Groq), each with its own key. Tests answer all of them with
+        // App\Support\Llm\FakeLlmClient (tests/TestCase.php).
+        $this->app->singleton(LlmProviders::class);
     }
 
     /**

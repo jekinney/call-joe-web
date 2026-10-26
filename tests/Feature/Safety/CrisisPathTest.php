@@ -63,7 +63,7 @@ it('keeps the crisis path when a failed reply is retried', function () {
 it('keeps a crisis mark when the reply fails', function () {
     $this->llm->reply('{"category": "self_harm"}');
     $text = app(Texting::class)->send($this->user, $this->entry, 'I want to die');
-    $this->llm->failFor('llama-3.1-8b-instant');
+    $this->llm->failAll();
 
     app(Texting::class)->reply($text);
 

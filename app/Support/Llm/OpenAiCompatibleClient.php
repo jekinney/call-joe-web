@@ -3,6 +3,7 @@
 namespace App\Support\Llm;
 
 use App\Contracts\LlmClient;
+use App\Enums\LlmProvider;
 use App\Exceptions\LlmException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -10,17 +11,18 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 /**
- * Groq's OpenAI-compatible chat completions. Rate limits and provider errors are retried twice with a short backoff
- * before giving up (then the gateway can try a fallback model).
+ * Chat completions in the OpenAI format, which Grok (xAI) and Groq both speak. Rate limits and provider errors are
+ * retried twice with a short backoff before giving up (then the gateway can try a fallback model).
  */
-class GroqClient implements LlmClient
+class OpenAiCompatibleClient implements LlmClient
 {
-    public function __construct(private string $apiKey, private string $baseUrl = 'https://api.groq.com/openai/v1', private int $timeoutSeconds = 30) {}
+    public function __construct(private LlmProvider $provider, private string $apiKey, private string $baseUrl, private int $timeoutSeconds = 30) {}
 
     public function chat(string $model, array $messages, array $options = []): LlmResponse
     {
+        $name = $this->provider->shortName();
         if ($this->apiKey === '') {
-            throw new LlmException('No Groq API key is set (GROQ_API_KEY).');
+            throw new LlmException("No {$name} API key is set ({$this->provider->envKey()}).", retryable: true);
         }
 
         try {
@@ -35,17 +37,19 @@ class GroqClient implements LlmClient
                     'temperature' => $options['temperature'] ?? 0.8,
                 ]);
         } catch (ConnectionException $e) {
-            throw new LlmException('Groq didn\'t answer in time: '.$e->getMessage(), retryable: true);
+            throw new LlmException("{$name} didn't answer in time: ".$e->getMessage(), retryable: true);
         }
 
         if ($response->failed()) {
-            $why = (string) ($response->json('error.message') ?? $response->body());
-            throw new LlmException("Groq answered {$response->status()}: ".mb_substr($why, 0, 200), retryable: $this->retryable($response));
+            $why = (string) ($response->json('error.message') ?? $response->json('error') ?? $response->body());
+            throw new LlmException("{$name} answered {$response->status()}: ".mb_substr($why, 0, 200), retryable: $this->retryable($response));
         }
 
         $text = $response->json('choices.0.message.content');
-        if (! is_string($text)) {
-            throw new LlmException('Groq sent no answer.', retryable: true);
+        if (! is_string($text) || trim($text) === '') {
+            $why = $response->json('choices.0.finish_reason') === 'content_filter' ? " ({$name} declined)" : '';
+
+            throw new LlmException("{$name} sent no answer{$why}.", retryable: true);
         }
 
         return new LlmResponse(
