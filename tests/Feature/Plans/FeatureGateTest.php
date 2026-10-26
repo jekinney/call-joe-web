@@ -34,7 +34,9 @@ it('sends guests to the plan page too (which then asks them to log in)', functio
 it('answers the feature gate by plan', function () {
     $free = User::factory()->create();
     $paid = User::factory()->create();
-    app(Entitlements::class)->assignPlan($paid, Plan::where('slug', 'paid')->firstOrFail(), null);
+    $limits = Plan::where('slug', 'paid')->firstOrFail()->limits;
+    $limits['features']['rated_r'] = true; // no shipped plan has it; the gate still works for one that does
+    app(Entitlements::class)->assignPlan($paid, Plan::factory()->create(['limits' => $limits]), null);
 
     expect(Gate::forUser($free)->allows('feature', Feature::RatedR))->toBeFalse()
         ->and(Gate::forUser($paid)->allows('feature', Feature::RatedR))->toBeTrue();

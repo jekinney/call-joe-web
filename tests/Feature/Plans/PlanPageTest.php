@@ -31,9 +31,20 @@ it('shows when a plan runs out', function () {
 
 it('explains a feature someone tried to use', function () {
     $this->actingAs(User::factory()->create())
+        ->withSession(['upgrade' => 'voicemail'])
+        ->get(route('app.plan'))
+        ->assertSee('Voicemail is part of a paid plan.');
+});
+
+it('promises only what the web app delivers', function () {
+    $this->actingAs(User::factory()->create())
         ->withSession(['upgrade' => 'rated_r'])
         ->get(route('app.plan'))
-        ->assertSee('Rated R flirting is part of a paid plan.');
+        ->assertOk()
+        ->assertSee('Voicemail')
+        ->assertDontSee('Rated R')
+        ->assertDontSee('Short videos')
+        ->assertDontSee('is part of a paid plan');
 });
 
 it('shows "no limit" for unlimited metrics', function () {

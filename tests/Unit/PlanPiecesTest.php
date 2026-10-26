@@ -35,6 +35,10 @@ it('labels features', function () {
     expect(collect(Feature::cases())->map->label()->all())->toBe(['Rated R flirting', 'Voicemail', 'Short videos']);
 });
 
+it('offers only the features the web app delivers', function () {
+    expect(Feature::offered())->toBe([Feature::Voicemail]);
+});
+
 it('shows prices', function () {
     expect((new Plan(['price_cents' => 0]))->priceLabel())->toBe('Free')
         ->and((new Plan(['price_cents' => 1499]))->priceLabel())->toBe('$14.99/month');
