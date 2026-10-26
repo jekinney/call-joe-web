@@ -62,6 +62,15 @@ Ports can be changed in `.env` (`APP_PORT`, `FORWARD_DB_PORT`, `VITE_PORT`, and 
 
 CI (GitHub Actions) runs Pint, Larastan and the full Pest suite against Postgres on every push and pull request, and fails below 95% line coverage. Outside services (LLMs, voice, images, payments) are always faked in tests; tests never touch the network.
 
+## Branches and releases
+
+- `main` is what has been released. `develop` is where work comes together; branch off `develop` (`feature/...`, `fix/...`) and open a pull request back into it.
+- Both branches are protected: changes arrive by pull request, and the `tests` check (Pint, Larastan, the Pest suite with coverage, and the front-end build) must pass first. Merges are squashed.
+- The release number is the `VERSION` file, and a release is the git tag `v` + that number. `0.0.0.1` is the first alpha, tagged `v0.0.0.1`; anything under 1.0 is published as a pre-release.
+- No tags have been made yet; the `release` workflow only runs once the first one is pushed.
+- To release: open a pull request that sets `VERSION` into `develop`, then a pull request from `develop` into `main`, then tag the merge commit on `main` (`git tag v0.0.0.2 && git push origin v0.0.0.2`). The `release` workflow checks the tag matches `VERSION`, runs the tests again and publishes the GitHub release with generated notes.
+- The running version shows at the bottom of the admin sidebar.
+
 ## Roadmap
 
 The MVP is built in small phases, each one tested before the next: environment, accounts, realtime (Reverb), plans and gating, contacts and the catalog, relationships and prompts, the LLM gateway, texting, memory, the PWA, voice calls, contacts reaching out (with relationship-based worry when you're away), safety, images and the shared image cache, billing, the admin dashboard, data rights, hardening, and launch on DigitalOcean.

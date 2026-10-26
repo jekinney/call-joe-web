@@ -31,6 +31,8 @@
                 <flux:navlist.item icon="arrow-left" :href="route('app.home')" wire:navigate>{{ __('Back to the app') }}</flux:navlist.item>
             </flux:navlist>
 
+            <flux:text size="xs" class="px-2" data-version>{{ __('Version :v', ['v' => config('app.version')]) }}</flux:text>
+
             <form method="POST" action="{{ route('logout') }}" class="w-full">
                 @csrf
                 <flux:button type="submit" variant="ghost" icon="arrow-right-start-on-rectangle" class="w-full justify-start">
