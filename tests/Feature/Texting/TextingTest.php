@@ -8,6 +8,7 @@ use App\Jobs\SendContactReply;
 use App\Models\Contact;
 use App\Models\Conversation;
 use App\Models\Llm;
+use App\Models\LlmCall;
 use App\Models\Message;
 use App\Models\Relationship;
 use App\Models\User;
@@ -55,6 +56,17 @@ it('stops at the daily limit and says when it resets', function () {
         ->toThrow(DomainException::class, "You've used today's 50 texts. They reset at 12:00 AM.");
     expect(Message::count())->toBe(0);
     Queue::assertNothingPushed();
+});
+
+it('replies with the contact\'s own brain, not one picked by the plan, and logs it', function () {
+    Queue::fake();
+    $text = texting()->send($this->user, $this->entry, 'Hey sis!');
+    $this->maya->update(['brain_id' => Llm::where('purpose', 'chat')->where('model_id', 'claude-sonnet-5-5')->value('id')]);
+
+    texting()->reply($text);
+
+    expect($this->llm->calls[0]['model'])->toBe('claude-sonnet-5-5')
+        ->and(LlmCall::where('purpose', 'chat')->sole()->contact_id)->toBe($this->maya->id);
 });
 
 it('replies with the frozen prompt and recent history, in bubbles, live', function () {

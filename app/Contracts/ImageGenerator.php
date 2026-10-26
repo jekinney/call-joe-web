@@ -6,7 +6,7 @@ use App\Exceptions\ImageException;
 use App\Support\Images\GeneratedImage;
 
 /**
- * Makes a picture from a prompt (App\Support\Images\TogetherImageClient; a fake in tests).
+ * Makes a picture from a prompt (App\Support\Images\XaiImageClient, Grok Imagine; a fake in tests).
  */
 interface ImageGenerator
 {

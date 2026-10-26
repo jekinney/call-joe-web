@@ -67,7 +67,7 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
             'model_id' => ['required', 'string', 'max:120'],
             'label' => ['required', 'string', 'max:80'],
             'purpose' => ['required', Rule::enum(LlmPurpose::class)],
-            'plan_tier' => ['nullable', Rule::in(['small', 'large', 'backup'])],
+            'plan_tier' => ['nullable', Rule::in(['small', 'large', Llm::ASSIGNED])],
             'fallback_id' => ['nullable', 'exists:llm_models,id', Rule::notIn([(string) $this->editingId])],
             'fast_thinking' => ['boolean'],
             'input_cents_per_mtok' => ['required', 'numeric', 'min:0', 'max:100000'],
@@ -133,7 +133,7 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
     <div class="flex items-center justify-between">
         <div>
             <flux:heading size="xl">{{ __('AI models') }}</flux:heading>
-            <flux:text class="mt-1">{{ __('Which model does each job. Free plans use the "small" tier, Paid the "large" one; "backup" models only step in when another fails. Changes apply within a minute.') }}</flux:text>
+            <flux:text class="mt-1">{{ __('Which model does each job. A contact\'s texts use the brain chosen for them in /admin/contacts (any model under Texting); "Any plan" models are the default for contacts without one, and "Assigned" models are only used when a contact is given one or another model fails. Changes apply within a minute.') }}</flux:text>
         </div>
         <flux:button variant="primary" icon="plus" wire:click="create">{{ __('Add model') }}</flux:button>
     </div>
@@ -175,7 +175,7 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
                 <flux:select.option value="">{{ __('Any plan') }}</flux:select.option>
                 <flux:select.option value="small">{{ __('Small (Free)') }}</flux:select.option>
                 <flux:select.option value="large">{{ __('Large (Paid)') }}</flux:select.option>
-                <flux:select.option value="backup">{{ __('Backup (only if another model fails)') }}</flux:select.option>
+                <flux:select.option value="assigned">{{ __('Assigned (a contact\'s brain, or a fallback)') }}</flux:select.option>
             </flux:select>
             <flux:select wire:model="fallback_id" :label="__('If it fails, use')">
                 <flux:select.option value="">{{ __('Nothing (show an error)') }}</flux:select.option>

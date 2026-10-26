@@ -36,6 +36,7 @@ new #[Layout('components.layouts.admin'), Title('Pictures')] class extends Compo
             'reused' => $reused,
             'hitRate' => $sent > 0 ? (int) round($reused / $sent * 100) : 0,
             'stopped' => (clone $recent)->whereIn('status', [ImageRequest::BLOCKED, ImageRequest::FAILED])->count(),
+            'spent' => (int) (clone $recent)->sum('cost_micros'),
             'top' => ImageCacheEntry::with('contact')
                 ->selectRaw('cache_key, contact_id, MIN(scene_signature) AS scene_signature, COUNT(*) AS variants, SUM(hits) AS hits')
                 ->groupBy('cache_key', 'contact_id')->orderByDesc('hits')->limit(10)->get(),
@@ -51,8 +52,8 @@ new #[Layout('components.layouts.admin'), Title('Pictures')] class extends Compo
         <flux:text class="mt-1">{{ __('The last 30 days. A reused picture comes from the shared cache instead of the provider.') }}</flux:text>
     </div>
 
-    <div class="grid grid-cols-2 gap-4 sm:grid-cols-4" data-stats>
-        @foreach ([__('Sent') => $sent, __('Reused') => $reused, __('Reuse rate') => $hitRate.'%', __('Blocked or failed') => $stopped] as $label => $value)
+    <div class="grid grid-cols-2 gap-4 sm:grid-cols-5" data-stats>
+        @foreach ([__('Sent') => $sent, __('Reused') => $reused, __('Reuse rate') => $hitRate.'%', __('Blocked or failed') => $stopped, __('Paid to Grok') => '$'.number_format($spent / 1_000_000, 2)] as $label => $value)
             <div class="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
                 <flux:text size="sm">{{ $label }}</flux:text>
                 <div class="mt-1 text-2xl font-semibold">{{ $value }}</div>

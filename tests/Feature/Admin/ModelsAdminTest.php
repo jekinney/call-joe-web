@@ -23,22 +23,27 @@ function modelsPage()
     return Volt::actingAs(test()->admin)->test('admin.models');
 }
 
+function grokRow(): Llm
+{
+    return Llm::where('purpose', 'chat')->where('model_id', 'grok-4.20-0309-non-reasoning')->firstOrFail();
+}
+
 it('keeps regular users out', function () {
     $this->actingAs(User::factory()->create())->get(route('admin.models'))->assertForbidden();
 });
 
 it('lists the models by purpose with last week\'s usage', function () {
-    $large = Llm::where('plan_tier', 'large')->first();
-    LlmCall::create(['llm_model_id' => $large->id, 'model' => $large->model_id, 'purpose' => 'chat', 'prompt_tokens' => 900, 'completion_tokens' => 100, 'status' => 'ok', 'cost_micros' => 2500]);
-    LlmCall::create(['llm_model_id' => $large->id, 'model' => $large->model_id, 'purpose' => 'chat', 'status' => 'error']);
+    $grok = grokRow();
+    LlmCall::create(['llm_model_id' => $grok->id, 'model' => $grok->model_id, 'purpose' => 'chat', 'prompt_tokens' => 900, 'completion_tokens' => 100, 'status' => 'ok', 'cost_micros' => 2500]);
+    LlmCall::create(['llm_model_id' => $grok->id, 'model' => $grok->model_id, 'purpose' => 'chat', 'status' => 'error']);
 
     $this->actingAs($this->admin)->get(route('admin.models'))
         ->assertOk()
         ->assertSee('Texting')->assertSee('Memory notes')->assertSee('Picture scenes')->assertSee('Voice calls')
-        ->assertSee('Claude Sonnet 5.5')->assertSee('claude-haiku-5-5')->assertSee('gemini-3.5-flash-lite')->assertSee('grok-4.20-0309-non-reasoning')
-        ->assertSee('If it fails: Gemini 3.8 Flash (backup)')
+        ->assertSee('Grok 4.20 fast')->assertSee('claude-sonnet-5-5')->assertSee('gemini-3.5-flash-lite')->assertSee('gemini-3.8-flash')
+        ->assertSee('If it fails: Claude Haiku 5.5 (fast)')
         ->assertSee('Last 7 days: 2 calls, 1,000 tokens, $0.0025, 1 errors')
-        ->assertSee('Backup')->assertSee('Fast')
+        ->assertSee('Assigned')->assertSee('Fast')
         ->assertDontSee('No models yet.');
 });
 
@@ -53,9 +58,8 @@ it('shows which providers have a key', function () {
 });
 
 it('adds a model, and the gateway uses it right away', function () {
-    $fast = Llm::where('model_id', 'gemini-3.5-flash-lite')->where('purpose', 'voice')->first();
     // Take the voice model away: that empty answer is now cached, and saving must clear it.
-    $fast->delete();
+    Llm::where('purpose', 'voice')->delete();
     app(LlmGateway::class)->forgetModels();
     expect(fn () => app(LlmGateway::class)->modelFor(LlmPurpose::Voice))->toThrow(LlmException::class);
 
@@ -66,7 +70,7 @@ it('adds a model, and the gateway uses it right away', function () {
         ->set('model_id', 'grok-4.20-0309-non-reasoning')
         ->set('label', 'Grok for calls')
         ->set('purpose', 'voice')
-        ->set('fallback_id', (string) Llm::where('plan_tier', 'small')->value('id'))
+        ->set('fallback_id', (string) grokRow()->id)
         ->set('fast_thinking', true)
         ->set('input_cents_per_mtok', '125')
         ->set('output_cents_per_mtok', '250')
@@ -78,6 +82,16 @@ it('adds a model, and the gateway uses it right away', function () {
 
     $voice = app(LlmGateway::class)->modelFor(LlmPurpose::Voice);
     expect($voice->only(['provider', 'model_id', 'fast_thinking']))->toBe(['provider' => LlmProvider::Xai, 'model_id' => 'grok-4.20-0309-non-reasoning', 'fast_thinking' => true]);
+});
+
+it('adds a model for contacts to be given, without any plan picking it', function () {
+    modelsPage()->call('create')
+        ->set('provider', 'gemini')->set('model_id', 'gemini-9-flash')->set('label', 'Gemini 9 Flash')->set('plan_tier', 'assigned')
+        ->set('input_cents_per_mtok', '20')->set('output_cents_per_mtok', '100')
+        ->call('save')->assertHasNoErrors();
+
+    expect(Llm::firstWhere('model_id', 'gemini-9-flash')->plan_tier)->toBe(Llm::ASSIGNED)
+        ->and(app(LlmGateway::class)->modelFor(LlmPurpose::Chat, User::factory()->create())->model_id)->toBe('grok-4.20-0309-non-reasoning');
 });
 
 it('suggests the models a provider offers while adding one', function () {
@@ -93,13 +107,13 @@ it('suggests the models a provider offers while adding one', function () {
 });
 
 it('edits a model, loading its current values', function () {
-    $large = Llm::where('plan_tier', 'large')->first();
+    $sonnet = Llm::where('purpose', 'chat')->where('model_id', 'claude-sonnet-5-5')->first();
 
     modelsPage()
-        ->call('edit', $large->id)
+        ->call('edit', $sonnet->id)
         ->assertSet('provider', 'anthropic')
         ->assertSet('model_id', 'claude-sonnet-5-5')
-        ->assertSet('plan_tier', 'large')
+        ->assertSet('plan_tier', 'assigned')
         ->assertSet('purpose', 'chat')
         ->assertSet('fast_thinking', true)
         ->set('model_id', 'claude-opus-5-5')
@@ -107,19 +121,19 @@ it('edits a model, loading its current values', function () {
         ->call('save')
         ->assertHasNoErrors();
 
-    expect($large->refresh()->only(['model_id', 'fast_thinking']))->toBe(['model_id' => 'claude-opus-5-5', 'fast_thinking' => false]);
+    expect($sonnet->refresh()->only(['model_id', 'fast_thinking']))->toBe(['model_id' => 'claude-opus-5-5', 'fast_thinking' => false]);
 });
 
 it('validates the form, and a model cannot fall back to itself', function () {
-    $large = Llm::where('plan_tier', 'large')->first();
+    $grok = grokRow();
 
     modelsPage()
-        ->call('edit', $large->id)
+        ->call('edit', $grok->id)
         ->set('provider', 'openai')
         ->set('model_id', '')
         ->set('purpose', 'dreams')
         ->set('plan_tier', 'huge')
-        ->set('fallback_id', (string) $large->id)
+        ->set('fallback_id', (string) $grok->id)
         ->set('input_cents_per_mtok', '-1')
         ->set('max_tokens', 5)
         ->call('save')
@@ -127,26 +141,25 @@ it('validates the form, and a model cannot fall back to itself', function () {
 });
 
 it('turns a model off and on, and the gateway follows', function () {
-    $large = Llm::where('plan_tier', 'large')->first();
     $paid = User::factory()->create();
     app(Entitlements::class)->assignPlan($paid, Plan::where('slug', 'paid')->first(), null);
 
-    modelsPage()->call('toggle', $large->id)->assertSee('Turn on');
+    modelsPage()->call('toggle', grokRow()->id)->assertSee('Turn on');
     expect(app(LlmGateway::class)->modelFor(LlmPurpose::Chat, $paid)->model_id)->toBe('claude-haiku-5-5');
 
-    modelsPage()->call('toggle', $large->id);
-    expect(app(LlmGateway::class)->modelFor(LlmPurpose::Chat, $paid)->model_id)->toBe('claude-sonnet-5-5');
+    modelsPage()->call('toggle', grokRow()->id);
+    expect(app(LlmGateway::class)->modelFor(LlmPurpose::Chat, $paid)->model_id)->toBe('grok-4.20-0309-non-reasoning');
 });
 
 it('tests a model on its own and shows its answer, or the error', function () {
-    $small = Llm::where('plan_tier', 'small')->first();
+    $haiku = Llm::where('purpose', 'chat')->where('model_id', 'claude-haiku-5-5')->first();
     $this->llm->reply('Hello there, friend!');
 
-    modelsPage()->call('test', $small->id)->assertSee('“Hello there, friend!” from claude-haiku-5-5');
+    modelsPage()->call('test', $haiku->id)->assertSee('“Hello there, friend!” from claude-haiku-5-5');
 
     // Even though it has a backup, the test shows the problem instead of covering it up.
     $this->llm->failFor('claude-haiku-5-5', retryable: true, message: 'Invalid API Key');
-    modelsPage()->call('test', $small->id)->assertSee('Invalid API Key')->assertDontSee('Hello there');
+    modelsPage()->call('test', $haiku->id)->assertSee('Invalid API Key')->assertDontSee('Hello there');
 });
 
 it('is linked from the admin sidebar', function () {

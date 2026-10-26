@@ -13,7 +13,10 @@ use App\Services\LlmGateway;
 use App\Services\LlmProviders;
 use Illuminate\Support\Facades\Http;
 
-// Choosing the model, sending it to the right provider, logging every call, and falling back when a model fails.
+// Choosing the model (a contact's own brain for texts), sending it to the right provider, logging every call, and
+// falling back when a model fails.
+
+const GROK = 'grok-4.20-0309-non-reasoning';
 
 function gateway(): LlmGateway
 {
@@ -32,44 +35,76 @@ function onPaid(User $user): User
     return $user;
 }
 
-it('uses the small model on Free and the large one on Paid', function () {
-    expect(gateway()->modelFor(LlmPurpose::Chat, User::factory()->create())->model_id)->toBe('claude-haiku-5-5')
-        ->and(gateway()->modelFor(LlmPurpose::Chat, onPaid(User::factory()->create()))->model_id)->toBe('claude-sonnet-5-5');
+function brain(string $modelId): Llm
+{
+    return Llm::where('purpose', 'chat')->where('model_id', $modelId)->firstOrFail();
+}
+
+it('texts on Grok by default, whatever the plan', function () {
+    expect(gateway()->modelFor(LlmPurpose::Chat, User::factory()->create())->model_id)->toBe(GROK)
+        ->and(gateway()->modelFor(LlmPurpose::Chat, onPaid(User::factory()->create()))->model_id)->toBe(GROK)
+        ->and(gateway()->modelFor(LlmPurpose::Chat)->model_id)->toBe(GROK);
 });
 
-it('starts out with Claude for texting, memory and safety, and Gemini for pictures and calls', function () {
+it('starts out with Grok for texting, Claude for the careful jobs, and Gemini for calls', function () {
     $chosen = fn (LlmPurpose $purpose) => gateway()->modelFor($purpose, User::factory()->create());
 
-    expect($chosen(LlmPurpose::Chat)->provider)->toBe(LlmProvider::Anthropic)
-        ->and($chosen(LlmPurpose::Memory)->provider)->toBe(LlmProvider::Anthropic)
-        ->and($chosen(LlmPurpose::Moderation)->provider)->toBe(LlmProvider::Anthropic)
-        ->and($chosen(LlmPurpose::Scenes)->provider)->toBe(LlmProvider::Gemini)
+    expect($chosen(LlmPurpose::Chat)->provider)->toBe(LlmProvider::Xai)
+        ->and($chosen(LlmPurpose::Memory)->only(['provider', 'model_id']))->toBe(['provider' => LlmProvider::Anthropic, 'model_id' => 'claude-sonnet-5-5'])
+        ->and($chosen(LlmPurpose::Moderation)->only(['provider', 'model_id']))->toBe(['provider' => LlmProvider::Anthropic, 'model_id' => 'claude-haiku-5-5'])
+        ->and($chosen(LlmPurpose::Scenes)->provider)->toBe(LlmProvider::Anthropic)
         ->and($chosen(LlmPurpose::Voice)->only(['provider', 'model_id']))->toBe(['provider' => LlmProvider::Gemini, 'model_id' => 'gemini-3.5-flash-lite']);
 });
 
+it('uses a contact\'s own brain for their texts', function () {
+    $joe = Contact::factory()->create(['brain_id' => brain('gemini-3.8-flash')->id]);
+    $maya = Contact::factory()->create(['brain_id' => brain('claude-sonnet-5-5')->id]);
+    $user = User::factory()->create();
+
+    expect(gateway()->modelFor(LlmPurpose::Chat, $user, $joe)->model_id)->toBe('gemini-3.8-flash')
+        ->and(gateway()->modelFor(LlmPurpose::Chat, onPaid(User::factory()->create()), $maya)->model_id)->toBe('claude-sonnet-5-5'); // the plan doesn't matter
+
+    gateway()->chat(LlmPurpose::Chat, hi(), $user, $joe);
+    expect($this->llm->calls[0]['model'])->toBe('gemini-3.8-flash')->and($this->llm->calls[0]['options'])->toBe(['max_tokens' => 1024, 'fast' => true]);
+});
+
+it('uses a contact\'s brain for texts only, not for memory, safety checks or pictures', function () {
+    $joe = Contact::factory()->create(['brain_id' => brain('gemini-3.8-flash')->id]);
+
+    expect(gateway()->modelFor(LlmPurpose::Memory, null, $joe)->model_id)->toBe('claude-sonnet-5-5')
+        ->and(gateway()->modelFor(LlmPurpose::Moderation, null, $joe)->model_id)->toBe('claude-haiku-5-5')
+        ->and(gateway()->modelFor(LlmPurpose::Scenes, null, $joe)->model_id)->toBe('claude-haiku-5-5')
+        ->and(gateway()->modelFor(LlmPurpose::Voice, null, $joe)->model_id)->toBe('gemini-3.5-flash-lite');
+});
+
+it('falls back to the default model for a contact whose brain is missing or turned off', function () {
+    $joe = Contact::factory()->withoutBrain()->create();
+    expect(gateway()->modelFor(LlmPurpose::Chat, null, $joe)->model_id)->toBe(GROK);
+
+    $maya = Contact::factory()->create(['brain_id' => brain('gemini-3.8-flash')->id]);
+    brain('gemini-3.8-flash')->update(['is_active' => false]);
+    expect(gateway()->modelFor(LlmPurpose::Chat, null, $maya->refresh())->model_id)->toBe(GROK);
+});
+
 it('uses an any-plan model when there is no tier match, and the first model with no user', function () {
-    expect(gateway()->modelFor(LlmPurpose::Memory, User::factory()->create())->label)->toBe('Claude Sonnet 5.5 (memory)')
-        ->and(gateway()->modelFor(LlmPurpose::Chat)->model_id)->toBe('claude-haiku-5-5');
+    expect(gateway()->modelFor(LlmPurpose::Memory, User::factory()->create())->label)->toBe('Claude Sonnet 5.5 (memory)');
 });
 
 it('never uses a model that is turned off', function () {
-    Llm::where('plan_tier', 'large')->update(['is_active' => false]);
+    brain(GROK)->update(['is_active' => false]);
     gateway()->forgetModels();
 
+    // Only assigned models are left for texting, so the first of them answers rather than nothing.
     expect(gateway()->modelFor(LlmPurpose::Chat, onPaid(User::factory()->create()))->model_id)->toBe('claude-haiku-5-5');
 });
 
-it('keeps backup models for when something fails, never choosing one on its own', function () {
-    Llm::whereIn('plan_tier', ['small', 'large'])->update(['is_active' => false]);
-    gateway()->forgetModels();
+it('keeps assigned models for contacts and fallbacks, never choosing them for a plan', function () {
+    $assigned = Llm::where('plan_tier', Llm::ASSIGNED)->orderBy('sort')->pluck('model_id')->all();
 
-    // With the real models off, a backup is the only chat model left, so it answers rather than nothing.
-    expect(gateway()->modelFor(LlmPurpose::Chat, User::factory()->create())->plan_tier)->toBe('backup');
-
-    Llm::whereIn('plan_tier', ['small', 'large'])->update(['is_active' => true]);
-    gateway()->forgetModels();
-    expect(gateway()->modelFor(LlmPurpose::Chat, User::factory()->create())->plan_tier)->toBe('small')
-        ->and(Llm::where('plan_tier', 'backup')->pluck('model_id')->all())->toBe(['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'grok-4.20-0309-non-reasoning']);
+    expect($assigned)->toBe(['claude-haiku-5-5', 'claude-sonnet-5-5', 'gemini-3.5-flash-lite', 'gemini-3.8-flash']);
+    foreach ([null, User::factory()->create(), onPaid(User::factory()->create())] as $user) {
+        expect(gateway()->modelFor(LlmPurpose::Chat, $user)->plan_tier)->toBeNull();
+    }
 });
 
 it('explains when no model is set up for a purpose', function () {
@@ -81,34 +116,34 @@ it('explains when no model is set up for a purpose', function () {
 
 it('picks up model changes once they are cleared from the cache', function () {
     $user = User::factory()->create();
-    expect(gateway()->modelFor(LlmPurpose::Chat, $user)->model_id)->toBe('claude-haiku-5-5');
+    expect(gateway()->modelFor(LlmPurpose::Chat, $user)->model_id)->toBe(GROK);
 
-    Llm::where('plan_tier', 'small')->update(['model_id' => 'claude-haiku-4-5-20251001']);
-    expect(gateway()->modelFor(LlmPurpose::Chat, $user)->model_id)->toBe('claude-haiku-5-5'); // still cached
+    brain(GROK)->update(['model_id' => 'grok-5']);
+    expect(gateway()->modelFor(LlmPurpose::Chat, $user)->model_id)->toBe(GROK); // still cached
 
     gateway()->forgetModels();
-    expect(gateway()->modelFor(LlmPurpose::Chat, $user)->model_id)->toBe('claude-haiku-4-5-20251001');
+    expect(gateway()->modelFor(LlmPurpose::Chat, $user)->model_id)->toBe('grok-5');
 });
 
-it('answers, sends the model\'s answer limit and speed setting, and logs tokens and cost', function () {
+it('answers, sends the model\'s answer limit, and logs tokens and cost', function () {
     $this->llm->reply('Hey Jamie!');
-    $user = onPaid(User::factory()->create());
-    $contact = Contact::factory()->create();
+    $user = User::factory()->create();
+    $contact = Contact::factory()->withoutBrain()->create();
 
     $reply = gateway()->chat(LlmPurpose::Chat, hi(), $user, $contact);
 
     expect($reply->text)->toBe('Hey Jamie!')
-        ->and($this->llm->calls[0]['model'])->toBe('claude-sonnet-5-5')
-        ->and($this->llm->calls[0]['options'])->toBe(['max_tokens' => 1024, 'fast' => true]);
+        ->and($this->llm->calls[0]['model'])->toBe(GROK)
+        ->and($this->llm->calls[0]['options'])->toBe(['max_tokens' => 1024]);
 
     $log = LlmCall::sole();
     expect($log->only(['user_id', 'contact_id', 'model', 'status']))->toBe([
-        'user_id' => $user->id, 'contact_id' => $contact->id, 'model' => 'claude-sonnet-5-5', 'status' => 'ok',
+        'user_id' => $user->id, 'contact_id' => $contact->id, 'model' => GROK, 'status' => 'ok',
     ])
         ->and($log->purpose)->toBe(LlmPurpose::Chat)
         ->and($log->prompt_tokens)->toBe($reply->promptTokens)
-        ->and($log->cost_micros)->toBe(Llm::where('plan_tier', 'large')->first()->costMicros($reply->promptTokens, $reply->completionTokens))
-        ->and($log->llmModel->plan_tier)->toBe('large');
+        ->and($log->cost_micros)->toBe(brain(GROK)->costMicros($reply->promptTokens, $reply->completionTokens))
+        ->and($log->llmModel->provider)->toBe(LlmProvider::Xai);
 });
 
 it('asks for fast answers only from models set to answer fast', function () {
@@ -128,50 +163,50 @@ it('lets a caller ask for a shorter answer', function () {
 });
 
 it('falls back to the backup model when the main one fails, logging both', function () {
-    $this->llm->failFor('claude-sonnet-5-5')->reply('From the backup');
+    $this->llm->failFor(GROK)->reply('From the backup');
 
-    $reply = gateway()->chat(LlmPurpose::Chat, hi(), onPaid(User::factory()->create()));
+    $reply = gateway()->chat(LlmPurpose::Chat, hi(), User::factory()->create());
 
     expect($reply->text)->toBe('From the backup')
-        ->and($this->llm->calls[1]['model'])->toBe('gemini-3.8-flash')
+        ->and($this->llm->calls[1]['model'])->toBe('claude-haiku-5-5')
         ->and(LlmCall::orderBy('id')->pluck('status')->all())->toBe(['error', 'fallback'])
         ->and(LlmCall::first()->error)->toBe('The fake provider is down.');
 });
 
 it('does not fall back for errors trying again won\'t fix', function () {
-    $this->llm->failFor('claude-sonnet-5-5', retryable: false, message: 'Invalid API Key');
+    $this->llm->failFor(GROK, retryable: false, message: 'Invalid API Key');
 
-    expect(fn () => gateway()->chat(LlmPurpose::Chat, hi(), onPaid(User::factory()->create())))->toThrow(LlmException::class, 'Invalid API Key')
+    expect(fn () => gateway()->chat(LlmPurpose::Chat, hi(), User::factory()->create()))->toThrow(LlmException::class, 'Invalid API Key')
         ->and(LlmCall::count())->toBe(1);
 });
 
 it('gives up when the backup fails too, or is turned off, or there is none', function () {
     $this->llm->failAll();
-    expect(fn () => gateway()->chat(LlmPurpose::Chat, hi(), onPaid(User::factory()->create())))->toThrow(LlmException::class);
+    expect(fn () => gateway()->chat(LlmPurpose::Chat, hi(), User::factory()->create()))->toThrow(LlmException::class);
     expect(LlmCall::where('status', 'error')->count())->toBe(2);
 
-    Llm::where('model_id', 'gemini-3.8-flash')->update(['is_active' => false]);
-    gateway()->forgetModels();
-    expect(fn () => gateway()->chat(LlmPurpose::Chat, hi(), onPaid(User::factory()->create())))->toThrow(LlmException::class);
-
-    Llm::where('plan_tier', 'small')->update(['fallback_id' => null]);
+    Llm::where('model_id', 'claude-haiku-5-5')->update(['is_active' => false]);
     gateway()->forgetModels();
     LlmCall::query()->delete();
-    expect(fn () => gateway()->chat(LlmPurpose::Chat, hi(), User::factory()->create()))->toThrow(LlmException::class)
-        ->and(LlmCall::count())->toBe(1);
+    expect(fn () => gateway()->chat(LlmPurpose::Chat, hi(), User::factory()->create()))->toThrow(LlmException::class)->and(LlmCall::count())->toBe(1);
+
+    brain(GROK)->update(['fallback_id' => null]);
+    gateway()->forgetModels();
+    LlmCall::query()->delete();
+    expect(fn () => gateway()->chat(LlmPurpose::Chat, hi(), User::factory()->create()))->toThrow(LlmException::class)->and(LlmCall::count())->toBe(1);
 });
 
 it('moves on to the fallback on another provider when a provider has no key', function () {
     app(LlmProviders::class)->fake(null); // the real clients, with whatever keys .env gives them
-    config(['services.anthropic.key' => '', 'services.gemini.key' => 'g-key', 'services.gemini.base_url' => 'https://gemini.test/v1beta']);
-    Http::fake(['gemini.test/*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => 'Hello from Gemini']]], 'finishReason' => 'STOP']], 'usageMetadata' => ['promptTokenCount' => 10, 'candidatesTokenCount' => 4]])]);
+    config(['services.gemini.key' => '', 'services.xai.key' => 'x-key', 'services.xai.base_url' => 'https://xai.test/v1']);
+    Http::fake(['xai.test/*' => Http::response(['choices' => [['message' => ['content' => 'Hello from Grok']]], 'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 4]])]);
 
-    $reply = gateway()->chat(LlmPurpose::Chat, hi(), onPaid(User::factory()->create()));
+    $reply = gateway()->chat(LlmPurpose::Voice, hi()); // calls: Gemini first, then Grok
 
-    expect($reply->text)->toBe('Hello from Gemini')
+    expect($reply->text)->toBe('Hello from Grok')
         ->and(LlmCall::orderBy('id')->get()->map->only(['model', 'status', 'error'])->all())->toBe([
-            ['model' => 'claude-sonnet-5-5', 'status' => 'error', 'error' => 'No Claude API key is set (ANTHROPIC_API_KEY).'],
-            ['model' => 'gemini-3.8-flash', 'status' => 'fallback', 'error' => null],
+            ['model' => 'gemini-3.5-flash-lite', 'status' => 'error', 'error' => 'No Gemini API key is set (GEMINI_API_KEY).'],
+            ['model' => GROK, 'status' => 'fallback', 'error' => null],
         ]);
 });
 

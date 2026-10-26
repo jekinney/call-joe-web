@@ -124,6 +124,9 @@ class Pictures
             return;
         }
 
+        // What it cost is kept even if the picture then turns out unusable: the provider charged for it.
+        $request->update(['provider_job_id' => $generated->providerJobId, 'cost_micros' => $generated->costMicros]);
+
         $picture = @imagecreatefromstring($generated->bytes);
         if (! $picture instanceof GdImage) {
             $this->settle($request, $entry, ImageRequest::FAILED, 'The provider sent something that isn\'t a picture.');
@@ -140,7 +143,6 @@ class Pictures
         if ($key !== null) {
             $this->cache->add($key, $entry->contact, $signature, $image);
         }
-        $request->update(['provider_job_id' => $generated->providerJobId]);
         $this->send($request, $entry, $image);
     }
 

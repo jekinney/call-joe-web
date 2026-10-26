@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Contact;
+use App\Models\Llm;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\ContactCatalog;
@@ -18,6 +19,12 @@ beforeEach(function () {
 function editor(?Contact $contact = null)
 {
     return Volt::actingAs(test()->admin)->test('admin.contacts.edit', $contact ? ['contact' => $contact] : []);
+}
+
+/** The id of a texting model, as the form holds it. */
+function brainFor(string $modelId = 'grok-4.20-0309-non-reasoning'): string
+{
+    return (string) Llm::where('purpose', 'chat')->where('model_id', $modelId)->value('id');
 }
 
 it('keeps regular users out', function () {
@@ -47,6 +54,7 @@ it('creates a contact and goes to its page', function () {
         ->set('gender', 'man')
         ->set('tagline', 'Kansas storyteller')
         ->set('requiredPlanId', (string) Plan::where('slug', 'paid')->value('id'))
+        ->set('brainId', brainFor())
         ->set('persona_md', '# Joe')
         ->set('looks', 'Gray mustache.')
         ->call('save')
@@ -55,6 +63,7 @@ it('creates a contact and goes to its page', function () {
 
     $contact = Contact::firstWhere('slug', 'joe-tucker');
     expect($contact->requiredPlan->slug)->toBe('paid')
+        ->and($contact->brain->model_id)->toBe('grok-4.20-0309-non-reasoning')
         ->and($contact->versions->first()->created_by)->toBe($this->admin->id);
 });
 
@@ -68,16 +77,51 @@ it('validates the form', function () {
         ->set('persona_md', '')
         ->set('requiredPlanId', '999999')
         ->call('save')
-        ->assertHasErrors(['name' => 'required', 'slug' => 'unique', 'gender' => 'in', 'persona_md' => 'required', 'requiredPlanId' => 'exists']);
+        ->assertHasErrors(['name' => 'required', 'slug' => 'unique', 'gender' => 'in', 'persona_md' => 'required', 'requiredPlanId' => 'exists', 'brainId' => 'required']);
+});
+
+it('needs a texting model as the brain', function () {
+    $callsModel = (string) Llm::where('purpose', 'voice')->value('id');
+
+    editor()->set('name', 'Joe')->set('persona_md', '# Joe')->set('brainId', $callsModel)->call('save')->assertHasErrors(['brainId' => 'exists']);
+    editor()->set('name', 'Joe')->set('persona_md', '# Joe')->set('brainId', '999999')->call('save')->assertHasErrors(['brainId' => 'exists']);
+});
+
+it('offers every active texting model as a brain, with what it costs', function () {
+    Llm::where('model_id', 'gemini-3.8-flash')->update(['is_active' => false]);
+
+    $this->actingAs($this->admin)->get(route('admin.contacts.create'))
+        ->assertSee('Gemini 3.5 Flash-Lite · Gemini · $0.30 in / $2.50 out')
+        ->assertSee('Grok 4.20 fast · Grok · $1.25 in / $2.50 out')
+        ->assertSee('Claude Sonnet 5.5 · Claude · $2.00 in / $10.00 out')
+        ->assertDontSee('Gemini 3.8 Flash')
+        ->assertDontSee('Claude Sonnet 5.5 (memory)'); // that one is for memory notes, not texting
+});
+
+it('lets only an admin set or change a brain', function () {
+    $contact = Contact::factory()->create();
+
+    Volt::actingAs(User::factory()->create())->test('admin.contacts.edit', ['contact' => $contact])->set('brainId', brainFor())->call('save')->assertForbidden();
+    $this->actingAs(User::factory()->create())->get(route('admin.contacts.edit', $contact))->assertForbidden();
+    expect($contact->refresh()->brain->model_id)->toBe('gemini-3.5-flash-lite');
+});
+
+it('changes a brain without changing who the contact is', function () {
+    $contact = Contact::factory()->create();
+
+    editor($contact)->assertSet('brainId', brainFor('gemini-3.5-flash-lite'))->set('brainId', brainFor('claude-sonnet-5-5'))->call('save')->assertHasNoErrors();
+
+    expect($contact->refresh()->brain->model_id)->toBe('claude-sonnet-5-5')->and($contact->version)->toBe(1)->and($contact->versions)->toHaveCount(0);
 });
 
 it('edits a contact: new version with a note, and loads the saved values', function () {
-    $contact = app(ContactCatalog::class)->create(['name' => 'Joe Tucker', 'gender' => 'man', 'persona_md' => '# v1', 'tagline' => 'Old']);
+    $contact = app(ContactCatalog::class)->create(['name' => 'Joe Tucker', 'gender' => 'man', 'persona_md' => '# v1', 'tagline' => 'Old', 'brain_id' => (int) brainFor()]);
 
     editor($contact)
         ->assertSet('name', 'Joe Tucker')
         ->assertSet('tagline', 'Old')
         ->assertSet('requiredPlanId', '')
+        ->assertSet('brainId', brainFor())
         ->set('persona_md', '# v2')
         ->set('note', 'Softer')
         ->call('save')
@@ -114,11 +158,14 @@ it('uploads a picture, and rejects ones that are too small', function () {
 });
 
 it('explains what is missing when publishing too early, then publishes and hides', function () {
-    $contact = Contact::factory()->create();
+    $contact = Contact::factory()->withoutBrain()->create();
 
-    editor($contact)->call('publish')->assertHasErrors('publish')->assertSee('still needs a picture and a voice');
+    editor($contact)->call('publish')->assertHasErrors('publish')->assertSee('still needs a picture, a voice and a brain');
 
     $contact->forceFill(['avatar_path' => 'contacts/x.jpg', 'voice_provider_id' => 'v1', 'voice_settings' => ['provider' => 'vapi']])->save();
+    editor($contact)->call('publish')->assertHasErrors('publish')->assertSee('still needs a brain');
+
+    $contact->forceFill(['brain_id' => brainFor()])->save();
     editor($contact)->call('publish')->assertHasNoErrors()->assertSee('Hide from catalog');
     expect($contact->refresh()->is_published)->toBeTrue();
 

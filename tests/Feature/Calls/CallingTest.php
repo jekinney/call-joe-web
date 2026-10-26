@@ -65,8 +65,8 @@ it('uses the texting model when no model is set up for calls', function () {
 
     $call = calling()->start($this->user, $this->entry);
 
-    expect($this->voice->assistants[$call->vapi_assistant_id]['model']['model'])->toBe('claude-haiku-5-5')
-        ->and($this->voice->assistants[$call->vapi_assistant_id]['model']['provider'])->toBe('anthropic');
+    expect($this->voice->assistants[$call->vapi_assistant_id]['model']['model'])->toBe('grok-4.20-0309-non-reasoning')
+        ->and($this->voice->assistants[$call->vapi_assistant_id]['model']['provider'])->toBe('xai');
 });
 
 it('limits a call to the call time left, and no more than 30 minutes', function () {

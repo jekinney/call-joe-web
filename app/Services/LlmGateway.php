@@ -24,9 +24,17 @@ class LlmGateway
 
     public function __construct(private LlmProviders $providers, private Entitlements $entitlements) {}
 
-    /** The active model for this purpose and user (their plan's tier first, then any-tier models). */
-    public function modelFor(LlmPurpose $purpose, ?User $user = null): Llm
+    /**
+     * The active model for this purpose. Texting with a contact uses the contact's own brain, chosen by whoever
+     * created them (users can't change it); everything else uses the purpose's models: the user's plan tier first,
+     * then any-tier models.
+     */
+    public function modelFor(LlmPurpose $purpose, ?User $user = null, ?Contact $contact = null): Llm
     {
+        if ($purpose === LlmPurpose::Chat && $contact?->brain?->is_active) {
+            return $contact->brain;
+        }
+
         $tier = $user ? (string) $this->entitlements->setting($user, 'llm_tier', 'small') : null;
 
         $models = Cache::remember($this->cacheKey($purpose), self::CACHE_SECONDS, fn () => Llm::with('fallback')
@@ -43,7 +51,7 @@ class LlmGateway
      */
     public function chat(LlmPurpose $purpose, array $messages, ?User $user = null, ?Contact $contact = null, array $options = []): LlmResponse
     {
-        return $this->ask($this->modelFor($purpose, $user), $purpose, $messages, $user, $contact, $options);
+        return $this->ask($this->modelFor($purpose, $user, $contact), $purpose, $messages, $user, $contact, $options);
     }
 
     /**

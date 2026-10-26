@@ -94,7 +94,9 @@ class ContactCatalog
     {
         $missing = $contact->missingForPublish();
         if ($missing) {
-            throw new InvalidArgumentException("{$contact->name} still needs ".implode(' and ', $missing).'.');
+            $last = array_pop($missing);
+
+            throw new InvalidArgumentException("{$contact->name} still needs ".($missing ? implode(', ', $missing).' and ' : '').$last.'.');
         }
 
         $contact->forceFill(['is_published' => true, 'published_at' => $contact->published_at ?? now()])->save();

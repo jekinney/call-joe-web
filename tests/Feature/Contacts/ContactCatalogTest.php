@@ -2,6 +2,7 @@
 
 use App\Models\Contact;
 use App\Models\ContactVersion;
+use App\Models\Llm;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\ContactCatalog;
@@ -109,16 +110,19 @@ it('has no picture address without a picture', function () {
     expect(newContact()->avatarUrl())->toBeNull();
 });
 
-it('publishes only when the contact has a persona, a picture and a voice', function () {
+it('publishes only when the contact has a persona, a picture, a voice and a brain', function () {
     Storage::fake('public');
     $contact = newContact();
 
-    expect(fn () => catalog()->publish($contact))->toThrow(InvalidArgumentException::class, 'Joe Tucker still needs a picture and a voice.');
+    expect(fn () => catalog()->publish($contact))->toThrow(InvalidArgumentException::class, 'Joe Tucker still needs a picture, a voice and a brain.');
 
     catalog()->setAvatar($contact, UploadedFile::fake()->image('joe.jpg', 512, 512));
-    expect(fn () => catalog()->publish($contact))->toThrow(InvalidArgumentException::class, 'Joe Tucker still needs a voice.');
+    expect(fn () => catalog()->publish($contact))->toThrow(InvalidArgumentException::class, 'Joe Tucker still needs a voice and a brain.');
 
     catalog()->update($contact, ['voice_provider_id' => 'voice-123', 'voice_settings' => ['provider' => '11labs']]);
+    expect(fn () => catalog()->publish($contact))->toThrow(InvalidArgumentException::class, 'Joe Tucker still needs a brain.');
+
+    catalog()->update($contact, ['brain_id' => Llm::where('purpose', 'chat')->value('id')]);
     catalog()->publish($contact);
 
     expect($contact->refresh()->is_published)->toBeTrue()
@@ -127,7 +131,7 @@ it('publishes only when the contact has a persona, a picture and a voice', funct
 });
 
 it('lists everything missing before publishing', function () {
-    expect((new Contact(['persona_md' => '  ']))->missingForPublish())->toBe(['a persona', 'a picture', 'a voice']);
+    expect((new Contact(['persona_md' => '  ']))->missingForPublish())->toBe(['a persona', 'a picture', 'a voice', 'a brain']);
 });
 
 it('has a voice only with both a provider and a voice id', function () {
@@ -166,6 +170,7 @@ it('seeds two sample drafts, and can run again safely', function () {
     $this->seed(DatabaseSeeder::class);
 
     expect(Contact::pluck('slug')->sort()->values()->all())->toBe(['joe-tucker', 'maya-brooks'])
+        ->and(Contact::with('brain')->orderBy('slug')->get()->pluck('brain.model_id')->all())->toBe(['gemini-3.5-flash-lite', 'grok-4.20-0309-non-reasoning'])
         ->and(Contact::published()->count())->toBe(0)
         ->and(User::where('email', 'test@example.com')->count())->toBe(1);
 });

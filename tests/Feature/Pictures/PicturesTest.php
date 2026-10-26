@@ -17,6 +17,7 @@ use App\Services\Phonebook;
 use App\Services\Pictures;
 use App\Services\PromptBuilder;
 use App\Services\Texting;
+use App\Support\Images\FakeImageGenerator;
 use App\Support\Images\GeneratedImage;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
@@ -123,8 +124,25 @@ it('makes, cleans, stores and sends the picture', function () {
         ->and($message->meta)->toEqual(['image_id' => $image->id, 'image_request_id' => $request->id])
         ->and($this->images->prompts)->toBe([$request->normalized_prompt])
         ->and($this->llm->calls[0]['messages'][1]['content'])->toContain('A prompt for a picture')
+        ->and($request->cost_micros)->toBe(FakeImageGenerator::COST_MICROS) // what the provider charged is kept
         ->and(picturesUsed())->toBe(1);
     Event::assertDispatched(ContactMessaged::class, fn ($e) => $e->message->is($message));
+});
+
+it('keeps what a picture cost even when it is then refused, and nothing when the provider fails', function () {
+    $this->images->refuse();
+    $refused = queuedPicture('my lunch');
+    $this->llm->reply('{"category": "none"}');
+    pictures()->generate($refused);
+
+    expect($refused->fresh()->status)->toBe('blocked')->and($refused->fresh()->cost_micros)->toBe(FakeImageGenerator::COST_MICROS);
+
+    $this->images->fail('Down');
+    $failed = queuedPicture('my dinner');
+    $this->llm->reply('{"category": "none"}');
+    pictures()->generate($failed);
+
+    expect($failed->fresh()->only(['status', 'cost_micros']))->toBe(['status' => 'failed', 'cost_micros' => 0]);
 });
 
 it('drops a picture the safety check stops, before asking the provider, and gives its count back', function () {
@@ -149,7 +167,7 @@ it('drops a picture the provider can\'t make, or refuses, and gives its count ba
     expect($request->fresh()->only(['status', 'error']))->toBe(['status' => $status, 'error' => $error])
         ->and(Image::count())->toBe(0)->and(Message::count())->toBe(0)->and(picturesUsed())->toBe(0);
 })->with([
-    'down' => [fn ($fake) => $fake->fail('Together answered 503'), 'failed', 'Together answered 503'],
+    'down' => [fn ($fake) => $fake->fail('Grok answered 503'), 'failed', 'Grok answered 503'],
     'refused (a black picture)' => [fn ($fake) => $fake->refuse(), 'blocked', 'Refused by the provider\'s safety checker.'],
 ]);
 

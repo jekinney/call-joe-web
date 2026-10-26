@@ -10,7 +10,7 @@ use App\Http\Middleware\EnsureTermsAccepted;
 use App\Models\User;
 use App\Services\Entitlements;
 use App\Services\LlmProviders;
-use App\Support\Images\TogetherImageClient;
+use App\Support\Images\XaiImageClient;
 use App\Support\Voice\VapiClient;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -32,13 +32,13 @@ class AppServiceProvider extends ServiceProvider
             (string) config('services.vapi.base_url'),
         ));
 
-        // Pictures. Tests swap in App\Support\Images\FakeImageGenerator (tests/TestCase.php).
-        $this->app->singleton(ImageGenerator::class, fn () => new TogetherImageClient(
-            (string) config('services.together.key'),
-            (string) config('services.together.base_url'),
-            (string) config('services.together.model'),
-            (int) config('services.together.steps'),
-            (int) config('services.together.timeout'),
+        // Pictures, from Grok Imagine (the same xAI key as Grok's texting). Tests swap in
+        // App\Support\Images\FakeImageGenerator (tests/TestCase.php).
+        $this->app->singleton(ImageGenerator::class, fn () => new XaiImageClient(
+            (string) config('services.xai.key'),
+            (string) config('services.xai.base_url'),
+            (string) config('services.xai.image_model'),
+            (int) config('services.xai.image_timeout'),
         ));
 
         // The AI providers (Claude, Gemini, Grok, Groq), each with its own key. Tests answer all of them with

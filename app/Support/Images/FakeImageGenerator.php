@@ -11,6 +11,9 @@ use App\Exceptions\ImageException;
  */
 class FakeImageGenerator implements ImageGenerator
 {
+    /** What each fake picture "costs": two cents, like Grok Imagine. */
+    public const COST_MICROS = 20_000;
+
     /** @var list<string> every prompt asked for */
     public array $prompts = [];
 
@@ -54,6 +57,6 @@ class FakeImageGenerator implements ImageGenerator
         // A comment segment right after the start marker, like camera metadata.
         $withMetadata = substr($jpeg, 0, 2)."\xFF\xFE".pack('n', 16).'Secret-GPS-00'.substr($jpeg, 2);
 
-        return new GeneratedImage($withMetadata, 'fake-'.count($this->prompts));
+        return new GeneratedImage($withMetadata, 'fake-'.count($this->prompts), self::COST_MICROS);
     }
 }

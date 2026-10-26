@@ -34,7 +34,9 @@ Then open http://localhost:8090.
 | Queue | Background jobs and broadcasts | (no port) |
 | Scheduler | Contacts reaching out on their own (`outreach:run`, every minute) | (no port) |
 
-**The brain:** every AI job (texting, memory notes, safety checks, picture scenes, calls) runs on a model you pick per job in `/admin/models`: Claude (through Anthropic's PHP SDK), Gemini, Grok, or Groq, each with its own key in `.env` and a fallback on another provider. Texting starts on Claude (Haiku on Free, Sonnet on Paid), calls on Gemini 3.5 Flash-Lite (about 0.9 s a reply). A model's "Answer fast" switch turns its thinking down (Claude: low effort; Gemini: thinking off).
+**The brain:** two keys run most of it. **Grok** (xAI) writes texts and makes pictures (Grok Imagine, $0.02 each); **Claude** does the careful jobs (memory notes, safety checks, picture scenes). A **Gemini** key adds cheap models for lower-tier contacts, and runs calls. Each model has a provider and a fallback on another provider, and is managed in `/admin/models` (Claude goes through Anthropic's PHP SDK; an "Answer fast" switch turns a model's thinking down).
+
+**A contact's brain** is the model that writes their texts. Whoever creates the contact chooses it, in `/admin/contacts` (a cheap Gemini for a lower-tier contact, Grok or Claude for a better one, with prices shown), and only an admin can change it: users never see or set it. A contact can't be published without one, and contacts without one use the default (Grok).
 
 Contacts keep living while you're away: the scheduler moves each one through their relationship's worry stages and plans texts and calls (`App\Services\Outreach`). Calls ring your open page or become missed calls; texts are written only when you're online to read them, with their original times. Try it with `./vendor/bin/sail artisan outreach:run`.
 

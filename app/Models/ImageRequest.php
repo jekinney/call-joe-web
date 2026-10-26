@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $cache_key
  * @property string|null $scene_signature what the scene boils down to (App\Services\PictureCache); null if personal
  * @property bool $from_cache the picture was reused, not made
+ * @property int $cost_micros what the provider charged, in millionths of a dollar (nothing when reused)
  * @property string $provider
  * @property string|null $provider_job_id
  * @property string $status queued | generating | ready | failed | blocked
@@ -39,13 +40,13 @@ class ImageRequest extends Model
 
     public const BLOCKED = 'blocked';
 
-    protected $fillable = ['user_contact_id', 'message_id', 'prompt', 'normalized_prompt', 'cache_key', 'scene_signature', 'provider', 'provider_job_id', 'status', 'from_cache', 'error', 'image_id'];
+    protected $fillable = ['user_contact_id', 'message_id', 'prompt', 'normalized_prompt', 'cache_key', 'scene_signature', 'provider', 'provider_job_id', 'status', 'from_cache', 'cost_micros', 'error', 'image_id'];
 
-    protected $attributes = ['status' => self::QUEUED, 'from_cache' => false];
+    protected $attributes = ['status' => self::QUEUED, 'from_cache' => false, 'cost_micros' => 0];
 
     protected function casts(): array
     {
-        return ['from_cache' => 'boolean'];
+        return ['from_cache' => 'boolean', 'cost_micros' => 'integer'];
     }
 
     /** @return BelongsTo<UserContact, $this> */

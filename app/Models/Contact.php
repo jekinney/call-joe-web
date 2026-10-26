@@ -27,12 +27,14 @@ use Illuminate\Support\Facades\Storage;
  * @property array<string, mixed>|null $voice_settings
  * @property string|null $avatar_path
  * @property int|null $required_plan_id
+ * @property int|null $brain_id the model that writes their texts: chosen by whoever creates the contact, never by users
  * @property bool $is_published
  * @property Carbon|null $published_at
  * @property int $version
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Plan|null $requiredPlan
+ * @property-read Llm|null $brain
  */
 class Contact extends Model
 {
@@ -40,7 +42,7 @@ class Contact extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'slug', 'name', 'tagline', 'gender', 'persona_md', 'looks', 'voice_provider_id', 'voice_settings', 'required_plan_id',
+        'slug', 'name', 'tagline', 'gender', 'persona_md', 'looks', 'voice_provider_id', 'voice_settings', 'required_plan_id', 'brain_id',
     ];
 
     protected $attributes = [
@@ -62,6 +64,17 @@ class Contact extends Model
     public function versions(): HasMany
     {
         return $this->hasMany(ContactVersion::class)->orderByDesc('version');
+    }
+
+    /**
+     * Who thinks for them (App\Services\LlmGateway uses it for their texts). Set when the contact is created, and
+     * changed only in /admin/contacts.
+     *
+     * @return BelongsTo<Llm, $this>
+     */
+    public function brain(): BelongsTo
+    {
+        return $this->belongsTo(Llm::class, 'brain_id');
     }
 
     /**
@@ -103,6 +116,7 @@ class Contact extends Model
             trim($this->persona_md) === '' ? 'a persona' : null,
             $this->avatar_path ? null : 'a picture',
             $this->voice() ? null : 'a voice',
+            $this->brain_id ? null : 'a brain',
         ]));
     }
 

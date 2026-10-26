@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $model_id
  * @property string $label
  * @property LlmPurpose $purpose
- * @property string|null $plan_tier small | large (the plan's llm_tier), backup (only ever a fallback), or null for any
+ * @property string|null $plan_tier small | large (the plan's llm_tier), assigned (only a contact's brain or a fallback), or null for any
  * @property bool $is_active
  * @property bool $fast_thinking think as little as the model allows (Claude: low effort; Gemini: no thinking)
  * @property int|null $fallback_id
@@ -27,6 +27,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Llm extends Model
 {
+    /** Never picked by a plan: answers only when a contact is given it as their brain, or when another model fails. */
+    public const ASSIGNED = 'assigned';
+
     protected $table = 'llm_models';
 
     protected $fillable = [

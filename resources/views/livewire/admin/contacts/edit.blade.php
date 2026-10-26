@@ -1,8 +1,10 @@
 <?php
 
 use App\Models\Contact;
+use App\Models\Llm;
 use App\Models\Plan;
 use App\Services\ContactCatalog;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -20,6 +22,8 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
     public string $tagline = '';
     public string $gender = 'woman';
     public string $requiredPlanId = '';
+    /** Who writes their texts: chosen when the contact is created, and changed only here (never by users). */
+    public string $brainId = '';
     public string $persona_md = '';
     public string $looks = '';
     public string $voiceProvider = '';
@@ -40,6 +44,7 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
             $this->voiceProvider = (string) ($contact->voice_settings['provider'] ?? '');
             $this->voiceId = (string) $contact->voice_provider_id;
             $this->requiredPlanId = (string) ($contact->required_plan_id ?? '');
+            $this->brainId = (string) ($contact->brain_id ?? '');
         }
     }
 
@@ -54,6 +59,7 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
             'tagline' => ['nullable', 'string', 'max:160'],
             'gender' => ['required', Rule::in(config('contacts.genders'))],
             'requiredPlanId' => ['nullable', 'exists:plans,id'],
+            'brainId' => ['required', Rule::exists('llm_models', 'id')->where('purpose', 'chat')],
             'persona_md' => ['required', 'string', 'max:20000'],
             'looks' => ['nullable', 'string', 'max:2000'],
             'voiceProvider' => ['nullable', 'required_with:voiceId', Rule::in(config('contacts.voice_providers'))],
@@ -64,6 +70,7 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
 
     public function save(ContactCatalog $catalog): void
     {
+        Gate::authorize('admin'); // creating a contact, and choosing or changing its brain, is for admins only
         $this->validate();
 
         $data = [
@@ -72,6 +79,7 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
             'tagline' => $this->tagline ?: null,
             'gender' => $this->gender,
             'required_plan_id' => $this->requiredPlanId !== '' ? (int) $this->requiredPlanId : null,
+            'brain_id' => (int) $this->brainId,
             'persona_md' => $this->persona_md,
             'looks' => $this->looks ?: null,
             'voice_provider_id' => $this->voiceId !== '' ? $this->voiceId : null,
@@ -132,6 +140,7 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
     {
         return [
             'plans' => Plan::orderBy('sort')->get(),
+            'brains' => Llm::where('purpose', 'chat')->where('is_active', true)->orderBy('sort')->get(),
             'versions' => $this->contact?->versions()->with('author')->limit(30)->get() ?? collect(),
             'rendered' => Str::markdown($this->persona_md, ['html_input' => 'strip', 'allow_unsafe_links' => false]),
         ];
@@ -183,6 +192,14 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
                     <flux:select.option :value="$plan->id">{{ $plan->name }}</flux:select.option>
                 @endforeach
             </flux:select>
+            <div class="sm:col-span-2">
+                <flux:select wire:model="brainId" :label="__('Brain')" :placeholder="__('Choose who thinks for them')" :description="__('The model that writes their texts, and what it costs per million tokens. Chosen when the contact is created; people who add them can\'t change it. Cheaper Gemini models suit lower-tier contacts.')">
+                    @foreach ($brains as $brain)
+                        <flux:select.option :value="$brain->id">{{ $brain->label }} · {{ $brain->provider->shortName() }} · ${{ number_format((float) $brain->input_cents_per_mtok / 100, 2) }} in / ${{ number_format((float) $brain->output_cents_per_mtok / 100, 2) }} out</flux:select.option>
+                    @endforeach
+                </flux:select>
+                <flux:error name="brainId" />
+            </div>
         </div>
 
         <div>

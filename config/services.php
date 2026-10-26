@@ -46,6 +46,9 @@ return [
         'key' => env('XAI_API_KEY', ''),
         'base_url' => env('XAI_BASE_URL', 'https://api.x.ai/v1'),
         'timeout' => (int) env('XAI_TIMEOUT', 30),
+        // Pictures contacts send (App\Support\Images\XaiImageClient): Grok Imagine, $0.02 a picture.
+        'image_model' => env('XAI_IMAGE_MODEL', 'grok-imagine-image'),
+        'image_timeout' => (int) env('XAI_IMAGE_TIMEOUT', 90),
     ],
 
     'groq' => [
@@ -62,15 +65,6 @@ return [
         'base_url' => env('VAPI_BASE_URL', 'https://api.vapi.ai'),
         'webhook_url' => env('VAPI_WEBHOOK_URL') ?: rtrim((string) env('APP_URL', 'http://localhost'), '/').'/webhooks/vapi',
         'webhook_secret' => env('VAPI_WEBHOOK_SECRET', ''),
-    ],
-
-    // Pictures contacts send (App\Support\Images\TogetherImageClient). FLUX.1 schnell: a few steps, a few seconds.
-    'together' => [
-        'key' => env('TOGETHER_API_KEY', ''),
-        'base_url' => env('TOGETHER_BASE_URL', 'https://api.together.xyz/v1'),
-        'model' => env('TOGETHER_IMAGE_MODEL', 'black-forest-labs/FLUX.1-schnell'),
-        'steps' => (int) env('TOGETHER_IMAGE_STEPS', 4),
-        'timeout' => (int) env('TOGETHER_TIMEOUT', 60),
     ],
 
     'slack' => [

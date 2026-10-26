@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Contact;
+use App\Models\Llm;
 use App\Services\ContactCatalog;
 use Illuminate\Database\Seeder;
 
@@ -59,9 +60,12 @@ class ContactSeeder extends Seeder
             ],
         ];
 
+        // Their brains: Joe is a lower-tier contact on a cheap Gemini, Maya thinks on Grok.
+        $brains = ['joe-tucker' => 'gemini-3.5-flash-lite', 'maya-brooks' => 'grok-4.20-0309-non-reasoning'];
+
         foreach ($samples as $sample) {
             if (! Contact::withTrashed()->where('slug', $sample['slug'])->exists()) {
-                $catalog->create($sample);
+                $catalog->create($sample + ['brain_id' => Llm::where('purpose', 'chat')->where('model_id', $brains[$sample['slug']])->value('id')]);
             }
         }
     }

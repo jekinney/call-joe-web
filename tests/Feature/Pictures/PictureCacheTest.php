@@ -58,8 +58,8 @@ it('boils a scene down to a tidy signature', function () {
 
     expect(pictureCache()->signature(mayaFor(), 'what I had for lunch'))
         ->toBe('{"action":"","outfit":"","setting":"the cafe","subject":"lunch","time_of_day":""}')
-        ->and($this->llm->calls[0]['model'])->toBe('gemini-3.5-flash-lite')
-        ->and($this->llm->calls[0]['options'])->toBe(['max_tokens' => 120, 'temperature' => 0.0]);
+        ->and($this->llm->calls[0]['model'])->toBe('claude-haiku-5-5')
+        ->and($this->llm->calls[0]['options'])->toBe(['max_tokens' => 120, 'temperature' => 0.0, 'fast' => true]);
 });
 
 it('falls back to a word list when the model can\'t say', function (?string $answer) {
@@ -90,6 +90,7 @@ it('makes a few variants, then reuses them for everyone, still counting each pic
     $first = collect(range(1, PictureCache::VARIANTS))->map(fn () => sendPicture(mayaFor()));
     expect(count($this->images->prompts))->toBe(PictureCache::VARIANTS)
         ->and($first->pluck('from_cache')->unique()->all())->toBe([false])
+        ->and($first->sum('cost_micros'))->toBe(3 * 20_000) // made, so paid for
         ->and(ImageCacheEntry::orderBy('variant')->pluck('variant')->all())->toBe([0, 1, 2]);
 
     $fourth = mayaFor();
@@ -97,7 +98,7 @@ it('makes a few variants, then reuses them for everyone, still counting each pic
 
     $entry = ImageCacheEntry::where('image_id', $reused->image_id)->sole();
     expect(count($this->images->prompts))->toBe(PictureCache::VARIANTS) // no new picture made
-        ->and($reused->only(['status', 'from_cache']))->toBe(['status' => 'ready', 'from_cache' => true])
+        ->and($reused->only(['status', 'from_cache', 'cost_micros']))->toBe(['status' => 'ready', 'from_cache' => true, 'cost_micros' => 0]) // reused: free
         ->and($reused->cache_key)->toBe($first[0]->cache_key)
         ->and($reused->scene_signature)->toBe('{"action":"","outfit":"","setting":"cafe","subject":"lunch","time_of_day":"noon"}')
         ->and($entry->only(['variant', 'hits']))->toBe(['variant' => 0, 'hits' => 1])
@@ -195,7 +196,7 @@ it('shows admins how much is reused, and starts a contact over', function () {
 
     $this->actingAs(User::factory()->create())->get(route('admin.pictures'))->assertForbidden();
     $this->actingAs($admin)->get(route('admin.pictures'))->assertOk()
-        ->assertSeeInOrder(['Sent', '4', 'Reused', '1', 'Reuse rate', '25%'])
+        ->assertSeeInOrder(['Sent', '4', 'Reused', '1', 'Reuse rate', '25%', 'Paid to Grok', '$0.06'])
         ->assertSee('Maya Brooks')->assertSee('&quot;subject&quot;:&quot;lunch&quot;', false)
         ->assertSee(route('admin.pictures'));
 
