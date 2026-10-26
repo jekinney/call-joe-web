@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
@@ -28,6 +29,18 @@ class Image extends Model
     protected function casts(): array
     {
         return ['width' => 'integer', 'height' => 'integer', 'bytes' => 'integer', 'nsfw_score' => 'float', 'created_at' => 'datetime'];
+    }
+
+    /** @return HasMany<ImageRequest, $this> */
+    public function requests(): HasMany
+    {
+        return $this->hasMany(ImageRequest::class);
+    }
+
+    /** @return HasMany<ImageCacheEntry, $this> */
+    public function cacheEntries(): HasMany
+    {
+        return $this->hasMany(ImageCacheEntry::class);
     }
 
     public function contents(): ?string

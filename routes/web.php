@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BraintreeWebhookController;
+use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\DeclineCallController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ImageController;
@@ -58,6 +59,8 @@ Route::prefix('app/settings')->middleware(['auth'])->group(function () {
     Volt::route('password', 'settings.password')->name('settings.password');
     Volt::route('appearance', 'settings.appearance')->name('settings.appearance');
     Volt::route('away', 'settings.away')->name('settings.away');
+    Volt::route('data', 'settings.data')->name('settings.data');
+    Route::get('data/export', DataExportController::class)->middleware('throttle:5,1')->name('settings.data.export');
 });
 
 // Running the service: admins only.
