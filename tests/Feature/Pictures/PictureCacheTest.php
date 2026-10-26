@@ -119,9 +119,10 @@ it('rotates variants, and gives someone one they haven\'t been sent', function (
     $c = sendPicture(mayaFor())->image_id;
     expect([$a, $b, $c])->toEqualCanonicalizing(Image::pluck('id')->all()); // each variant once, least used first
 
-    // The first owner already has variant 0; they get another one.
+    // The first owner already has one variant; they get a different one.
+    $had = $owners[0]->messages()->orderBy('id')->firstOrFail()->meta['image_id'];
     $again = sendPicture($owners[0]);
-    expect($again->image_id)->not->toBe($owners[0]->messages()->first()->meta['image_id']);
+    expect($again->image_id)->not->toBe($had);
 
     // Someone who has every variant gets the least recently used.
     $collector = mayaFor();
