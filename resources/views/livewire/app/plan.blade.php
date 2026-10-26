@@ -132,8 +132,8 @@ new #[Title('Plan & usage')] class extends Component {
             'plans' => $plans,
             'purchasable' => $plans->filter(fn (Plan $plan) => $billing->isPurchasable($plan))->pluck('id')->all(),
             'subscription' => $billing->current($user),
-            'features' => Feature::cases(),
-            'upgrade' => Feature::tryFrom((string) session('upgrade')),
+            'features' => Feature::offered(),
+            'upgrade' => collect(Feature::offered())->first(fn (Feature $feature) => $feature->value === session('upgrade')),
         ];
     }
 }; ?>
