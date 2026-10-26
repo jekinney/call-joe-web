@@ -15,10 +15,10 @@ Route::get('/', function () {
 })->name('home');
 
 // The voice service's call reports (checked by a secret header; no session or CSRF token).
-Route::post('webhooks/voice', VoiceWebhookController::class)->name('webhooks.voice');
+Route::post('webhooks/voice', VoiceWebhookController::class)->middleware('throttle:120,1')->name('webhooks.voice');
 
 // Braintree's payment webhooks (checked by Braintree's signature; no session or CSRF token).
-Route::match(['get', 'post'], 'webhooks/braintree', BraintreeWebhookController::class)->name('webhooks.braintree');
+Route::match(['get', 'post'], 'webhooks/braintree', BraintreeWebhookController::class)->middleware('throttle:120,1')->name('webhooks.braintree');
 
 // Shown by the service worker when there's no connection (cached when the app is installed).
 Route::view('offline', 'offline')->name('offline');

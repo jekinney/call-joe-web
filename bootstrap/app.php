@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureAdult;
 use App\Http\Middleware\EnsureFeature;
 use App\Http\Middleware\EnsureNotSuspended;
 use App\Http\Middleware\EnsureTermsAccepted;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         // Webhooks prove themselves with their own secret, not a CSRF token.
         $middleware->validateCsrfTokens(except: ['webhooks/*']);
+
+        // Behind a load balancer: TRUSTED_PROXIES is "*" or a comma-separated list of addresses (empty trusts none).
+        $middleware->trustProxies(at: array_filter(array_map('trim', explode(',', (string) env('TRUSTED_PROXIES', '')))) ?: null);
+        $middleware->appendToGroup('web', SecurityHeaders::class);
 
         $middleware->alias([
             'adult' => EnsureAdult::class,
