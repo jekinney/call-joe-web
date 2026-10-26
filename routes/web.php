@@ -62,7 +62,7 @@ Route::prefix('app/settings')->middleware(['auth'])->group(function () {
 
 // Running the service: admins only.
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'can:admin'])->group(function () {
-    Route::view('/', 'admin.home')->name('home');
+    Volt::route('/', 'admin.home')->name('home');
     Volt::route('users', 'admin.users.index')->name('users.index');
     Volt::route('users/{user}', 'admin.users.show')->name('users.show');
     Volt::route('contacts', 'admin.contacts.index')->name('contacts.index');

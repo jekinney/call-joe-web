@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -15,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property int $amount_cents
  * @property string $status paid | failed
  * @property Carbon $occurred_at
+ * @property-read User $user
  */
 class Payment extends Model
 {
@@ -23,5 +25,11 @@ class Payment extends Model
     protected function casts(): array
     {
         return ['amount_cents' => 'integer', 'occurred_at' => 'datetime'];
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }
