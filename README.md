@@ -4,7 +4,7 @@ An AI companion web app by 120 Customs LLC: talk and text with AI friends ("cont
 
 > **Proprietary software.** This code is public so it can be viewed as a sample of the work. It is not open source: no license is granted to use, copy, modify or host it. See [LICENSE](LICENSE).
 
-Built with Laravel 12, Livewire 4 (Volt and Flux), Postgres, Valkey, Reverb, and Vapi for voice. Installable as a PWA.
+Built with Laravel 12, Livewire 4 (Volt and Flux), Postgres, Valkey, Reverb, and a small Pipecat service (`voice/`) for voice calls with Gemini Live. Installable as a PWA.
 
 ## Local setup
 
@@ -33,10 +33,13 @@ Then open http://localhost:8090.
 | Reverb | Real-time WebSockets (texts, rings, notices) | ws://localhost:8091 |
 | Queue | Background jobs and broadcasts | (no port) |
 | Scheduler | Contacts reaching out on their own (`outreach:run`, every minute) | (no port) |
+| Voice | Voice calls: Pipecat + Gemini Live, run on your machine, not in Docker (see `voice/README.md`) | http://localhost:8787 |
 
 **The brain:** two keys run most of it. **Grok** (xAI) writes texts and makes pictures (Grok Imagine, $0.02 each); **Claude** does the careful jobs (memory notes, safety checks, picture scenes). A **Gemini** key adds cheap models for lower-tier contacts, and runs calls. Each model has a provider and a fallback on another provider, and is managed in `/admin/models` (Claude goes through Anthropic's PHP SDK; an "Answer fast" switch turns a model's thinking down).
 
 **A contact's brain** is the model that writes their texts. Whoever creates the contact chooses it, in `/admin/contacts` (a cheap Gemini for a lower-tier contact, Grok or Claude for a better one, with prices shown), and only an admin can change it: users never see or set it. A contact can't be published without one, and contacts without one use the default (Grok).
+
+**Voice calls** use Gemini Live through our own Pipecat service in `voice/` (one Gemini key, no cloned voices for now): a contact's voice is one of Gemini's built-in voices, picked in `/admin/contacts`. Start it with the steps in `voice/README.md` before making a call.
 
 Contacts keep living while you're away: the scheduler moves each one through their relationship's worry stages and plans texts and calls (`App\Services\Outreach`). Calls ring your open page or become missed calls; texts are written only when you're online to read them, with their original times. Try it with `./vendor/bin/sail artisan outreach:run`.
 

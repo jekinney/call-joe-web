@@ -17,11 +17,11 @@ beforeEach(function () {
 });
 
 it('names each provider and the setting that holds its key', function () {
-    expect(collect(LlmProvider::cases())->map(fn (LlmProvider $p) => [$p->value, $p->label(), $p->shortName(), $p->envKey(), $p->vapiName(), $p->exampleModel()])->all())->toBe([
-        ['anthropic', 'Claude (Anthropic)', 'Claude', 'ANTHROPIC_API_KEY', 'anthropic', 'claude-haiku-5-5'],
-        ['gemini', 'Gemini (Google)', 'Gemini', 'GEMINI_API_KEY', 'google', 'gemini-3.5-flash-lite'],
-        ['xai', 'Grok (xAI)', 'Grok', 'XAI_API_KEY', 'xai', 'grok-4.20-0309-non-reasoning'],
-        ['groq', 'Groq', 'Groq', 'GROQ_API_KEY', 'groq', 'llama-3.3-70b-versatile'],
+    expect(collect(LlmProvider::cases())->map(fn (LlmProvider $p) => [$p->value, $p->label(), $p->shortName(), $p->envKey(), $p->exampleModel()])->all())->toBe([
+        ['anthropic', 'Claude (Anthropic)', 'Claude', 'ANTHROPIC_API_KEY', 'claude-haiku-5-5'],
+        ['gemini', 'Gemini (Google)', 'Gemini', 'GEMINI_API_KEY', 'gemini-3.5-flash-lite'],
+        ['xai', 'Grok (xAI)', 'Grok', 'XAI_API_KEY', 'grok-4.20-0309-non-reasoning'],
+        ['groq', 'Groq', 'Groq', 'GROQ_API_KEY', 'llama-3.3-70b-versatile'],
     ]);
 });
 

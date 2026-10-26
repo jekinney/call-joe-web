@@ -11,7 +11,7 @@ use App\Models\User;
 use App\Services\Entitlements;
 use App\Services\LlmProviders;
 use App\Support\Images\XaiImageClient;
-use App\Support\Voice\VapiClient;
+use App\Support\Voice\PipecatClient;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
@@ -26,10 +26,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(Entitlements::class);
 
         // Voice calls. Tests swap in App\Support\Voice\FakeVoiceProvider (tests/TestCase.php).
-        $this->app->singleton(VoiceProvider::class, fn () => new VapiClient(
-            (string) config('services.vapi.private_key'),
-            (string) config('services.vapi.public_key'),
-            (string) config('services.vapi.base_url'),
+        $this->app->singleton(VoiceProvider::class, fn () => new PipecatClient(
+            (string) config('services.voice.url'),
+            (string) config('services.voice.public_url'),
+            (string) config('services.voice.secret'),
         ));
 
         // Pictures, from Grok Imagine (the same xAI key as Grok's texting). Tests swap in

@@ -11,7 +11,7 @@
     </ul>
 
     <h2>Who processes it</h2>
-    <p>To write replies and run calls, your messages are sent to the AI and voice providers we use (currently Anthropic, Google and xAI for text, and Vapi for calls), under their terms for business customers. We host on DigitalOcean. We don't sell your data or use it for advertising.</p>
+    <p>To write replies and run calls, your messages are sent to the AI and voice providers we use (currently Anthropic, Google and xAI for text, and Google for calls), under their terms for business customers. We host on DigitalOcean. We don't sell your data or use it for advertising.</p>
 
     <h2>Who sees it</h2>
     <p>No one reads your conversations as a matter of course. A small number of staff can see safety records, and account details when you ask for help.</p>

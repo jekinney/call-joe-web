@@ -9,6 +9,7 @@ use App\Exceptions\LlmException;
 use App\Exceptions\VoiceException;
 use App\Jobs\UpdateMemory;
 use App\Models\Call;
+use App\Models\LlmCall;
 use App\Models\Message;
 use App\Models\OutreachEvent;
 use App\Models\User;
@@ -18,10 +19,11 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 
 /**
- * Voice calls through Vapi. Starting a call builds a one-off Vapi assistant with the contact's prompt and memory at
- * that moment (so the prompt stays on the server and the same for the whole call), limited to the plan's call time
- * left. Vapi's end-of-call report (App\Http\Controllers\VapiWebhookController) then records the length and
- * transcript, uses up the call time, adds the call to the conversation, and updates the contact's memory.
+ * Voice calls through our voice service (voice/, Pipecat speaking with Gemini Live). Starting a call makes a one-off
+ * session there with the contact's prompt, voice and memory at that moment (so the prompt stays on the server and the
+ * same for the whole call), limited to the plan's call time left. The service's end-of-call report
+ * (App\Http\Controllers\VoiceWebhookController) then records the length and transcript, prices the call from its token
+ * usage, uses up the call time, adds the call to the conversation, and updates the contact's memory.
  */
 class Calling
 {
@@ -31,7 +33,7 @@ class Calling
     /** No single call runs longer than this. */
     public const MAX_SECONDS = 30 * 60;
 
-    /** The header Vapi sends with every report, so nobody else can post fake ones. */
+    /** The header the voice service and Laravel send each other, so nobody else can post fake reports or sessions. */
     public const SECRET_HEADER = 'X-Call-Joe-Secret';
 
     public function __construct(
@@ -44,7 +46,7 @@ class Calling
     ) {}
 
     /**
-     * Gets a call ready: returns the call, with the Vapi assistant the browser starts. With $answering, it's the
+     * Gets a call ready: returns the call, with the voice session the browser connects to. With $answering, it's the
      * user picking up the contact's ringing call (App\Services\Outreach), and the contact says why they called.
      *
      * @throws DomainException with a reason the user can read.
@@ -55,7 +57,7 @@ class Calling
         if ($answering && ($answering->user_contact_id !== $entry->id || $answering->status !== Call::RINGING)) {
             throw new DomainException('That call already ended.');
         }
-        $voice = $entry->contact->voice() ?? throw new DomainException("{$entry->displayName()} can't take calls yet.");
+        $voice = $entry->contact->voice ?: throw new DomainException("{$entry->displayName()} can't take calls yet.");
 
         $left = $this->entitlements->remaining($user, Metric::VoiceSeconds);
         if ($left !== null && $left < self::MIN_SECONDS) {
@@ -79,28 +81,19 @@ class Calling
         try {
             $model = $this->gateway->modelFor(LlmPurpose::Voice, $user);
         } catch (LlmException) {
-            $model = $this->gateway->modelFor(LlmPurpose::Chat, $user);
+            throw new DomainException("{$entry->displayName()} can't take calls right now.");
         }
 
-        $fields = ['status' => Call::STARTING, 'prompt_hash' => hash('sha256', $prompt), 'max_seconds' => $max];
+        $fields = ['status' => Call::STARTING, 'prompt_hash' => hash('sha256', $prompt), 'max_seconds' => $max, 'llm_model_id' => $model->id];
         $call = $answering ? tap($answering)->update($fields) : $entry->calls()->create($fields);
 
         try {
-            $assistantId = $this->voice->createAssistant([
-                'name' => "Call Joe call {$call->id}",
-                'firstMessageMode' => 'assistant-speaks-first-with-model-generated-message',
-                'model' => [
-                    'provider' => $model->provider->vapiName(),
-                    'model' => $model->model_id,
-                    'messages' => [['role' => 'system', 'content' => $prompt]],
-                    'temperature' => 0.8,
-                    'maxTokens' => 250,
-                ],
+            $sessionId = $this->voice->createSession([
+                'call_id' => $call->id,
+                'prompt' => $prompt,
                 'voice' => $voice,
-                'maxDurationSeconds' => $max,
-                'server' => ['url' => config('services.vapi.webhook_url'), 'headers' => [self::SECRET_HEADER => config('services.vapi.webhook_secret')]],
-                'serverMessages' => ['status-update', 'end-of-call-report'],
-                'metadata' => ['call_id' => $call->id],
+                'model' => $model->model_id,
+                'max_seconds' => $max,
             ]);
         } catch (VoiceException $e) {
             $call->update(['status' => Call::FAILED, 'ended_reason' => mb_substr($e->getMessage(), 0, 100)]);
@@ -108,27 +101,28 @@ class Calling
             throw new DomainException("Couldn't reach {$entry->displayName()} right now. Try again in a minute.");
         }
 
-        $call->update(['vapi_assistant_id' => $assistantId]);
+        $call->update(['voice_session_id' => $sessionId]);
 
         return $call;
     }
 
-    public function publicKey(): string
+    /** Where the browser connects for this call. */
+    public function connectUrl(Call $call): string
     {
-        return $this->voice->publicKey();
+        return $this->voice->connectUrl((string) $call->voice_session_id);
     }
 
-    /** The browser connected (or Vapi said the call is in progress). */
-    public function connected(Call $call, ?string $vapiCallId = null): void
+    /** The browser connected (or the voice service said the call is in progress). */
+    public function connected(Call $call): void
     {
         if ($call->isOver()) {
             return;
         }
 
-        $call->update(['status' => Call::ACTIVE, 'started_at' => $call->started_at ?? now(), 'vapi_call_id' => $call->vapi_call_id ?? $vapiCallId]);
+        $call->update(['status' => Call::ACTIVE, 'started_at' => $call->started_at ?? now()]);
     }
 
-    /** The browser says the call ended; Vapi's report fills in the details. */
+    /** The browser says the call ended; the voice service's report fills in the details. */
     public function hungUp(Call $call): void
     {
         if (! $call->isOver()) {
@@ -137,7 +131,7 @@ class Calling
     }
 
     /**
-     * Vapi's status update. Returns false when the call isn't ours.
+     * The voice service's status update. Returns false when the call isn't ours.
      *
      * @param  array<string, mixed>  $message
      */
@@ -149,7 +143,7 @@ class Calling
         }
 
         match (Arr::get($message, 'status')) {
-            'in-progress' => $this->connected($call, Arr::get($message, 'call.id')),
+            'in-progress' => $this->connected($call),
             'ended' => $this->hungUp($call),
             default => null,
         };
@@ -158,7 +152,8 @@ class Calling
     }
 
     /**
-     * Vapi's end-of-call report: length, transcript, call time used, the call in the conversation, memory.
+     * The voice service's end-of-call report: length, transcript, token usage (priced at the call's model), call time
+     * used, the call in the conversation, memory.
      * Safe to receive twice. Returns false when the call isn't ours.
      *
      * @param  array<string, mixed>  $message
@@ -175,7 +170,10 @@ class Calling
 
         $entry = $call->userContact()->with(['user', 'contact'])->firstOrFail();
         $seconds = max(0, min($call->max_seconds, $this->durationOf($message, $call)));
-        $cost = Arr::get($message, 'cost', Arr::get($message, 'call.cost'));
+        $in = max(0, (int) Arr::get($message, 'usage.inputTokens', 0));
+        $out = max(0, (int) Arr::get($message, 'usage.outputTokens', 0));
+        $model = $call->llmModel;
+        $cost = $model ? $model->costMicros($in, $out) : 0;
 
         $call->update([
             'status' => Call::ENDED,
@@ -183,8 +181,16 @@ class Calling
             'duration_seconds' => $seconds,
             'ended_reason' => mb_substr((string) Arr::get($message, 'endedReason', Arr::get($message, 'call.endedReason', '')), 0, 100) ?: null,
             'transcript' => trim((string) Arr::get($message, 'artifact.transcript', Arr::get($message, 'transcript', ''))) ?: null,
-            'cost_micros' => is_numeric($cost) ? (int) round($cost * 1_000_000) : null,
+            'cost_micros' => $cost,
         ]);
+
+        if ($model && ($in > 0 || $out > 0)) {
+            LlmCall::create([
+                'user_id' => $entry->user_id, 'contact_id' => $entry->contact_id, 'llm_model_id' => $model->id, 'model' => $model->model_id,
+                'purpose' => LlmPurpose::Voice, 'prompt_tokens' => $in, 'completion_tokens' => $out, 'latency_ms' => $seconds * 1000,
+                'status' => 'ok', 'cost_micros' => $cost,
+            ]);
+        }
 
         $this->useCallTime($entry->user, $seconds);
 
@@ -201,8 +207,8 @@ class Calling
             UpdateMemory::afterQuiet($entry->id);
         }
 
-        if ($call->vapi_assistant_id) {
-            $this->voice->deleteAssistant($call->vapi_assistant_id);
+        if ($call->voice_session_id) {
+            $this->voice->deleteSession($call->voice_session_id);
         }
 
         return true;
@@ -233,14 +239,14 @@ class Calling
     }
 
     /**
-     * Our call for a Vapi message: by its assistant (each call has its own), or the call id we put in its metadata.
+     * Our call for a voice service message: by its session (each call has its own), or the call id we gave the session.
      *
      * @param  array<string, mixed>  $message
      */
     private function callFor(array $message): ?Call
     {
         $assistantId = Arr::get($message, 'call.assistantId', Arr::get($message, 'assistant.id'));
-        if (is_string($assistantId) && ($call = Call::where('vapi_assistant_id', $assistantId)->first())) {
+        if (is_string($assistantId) && ($call = Call::where('voice_session_id', $assistantId)->first())) {
             return $call;
         }
 

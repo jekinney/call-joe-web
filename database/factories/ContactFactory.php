@@ -39,7 +39,7 @@ class ContactFactory extends Factory
 
     public function withVoice(): static
     {
-        return $this->state(fn () => ['voice_provider_id' => 'test-voice', 'voice_settings' => ['provider' => 'vapi']]);
+        return $this->state(fn () => ['voice' => 'Puck']);
     }
 
     public function published(): static

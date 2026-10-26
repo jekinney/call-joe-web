@@ -55,15 +55,6 @@ enum LlmProvider: string
         return $this->key() !== '';
     }
 
-    /** What Vapi calls this provider (calls still run on Vapi until Pipecat replaces it). */
-    public function vapiName(): string
-    {
-        return match ($this) {
-            self::Gemini => 'google',
-            default => $this->value,
-        };
-    }
-
     /** An example of a model id, for the admin form. */
     public function exampleModel(): string
     {

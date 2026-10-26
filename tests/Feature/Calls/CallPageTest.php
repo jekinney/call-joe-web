@@ -31,20 +31,20 @@ it('starts a call and hands the browser only the public key and the call\'s assi
     $page = callPage()->call('start')->assertSet('state', 'connecting')->assertSee('Calling…');
 
     $call = Call::sole();
-    $page->assertDispatched('vapi-start', publicKey: 'pk_fake', assistantId: $call->vapi_assistant_id, callId: $call->id);
+    $page->assertDispatched('voice-start', connectUrl: "https://voice.test/api/offer?session={$call->voice_session_id}", callId: $call->id);
 });
 
 it('follows the call as it connects and ends', function () {
     callPage()->call('start')
-        ->dispatch('vapi-connected', vapiCallId: 'call_1')->assertSet('state', 'active')->assertSee('On the call')->assertSee('Hang up')
-        ->call('hangUp')->assertDispatched('vapi-stop')
-        ->dispatch('vapi-ended')->assertSet('state', 'ended')->assertSee('Call ended')->assertSee('Call again');
+        ->dispatch('voice-connected')->assertSet('state', 'active')->assertSee('On the call')->assertSee('Hang up')
+        ->call('hangUp')->assertDispatched('voice-stop')
+        ->dispatch('voice-ended')->assertSet('state', 'ended')->assertSee('Call ended')->assertSee('Call again');
 
-    expect(Call::sole()->status)->toBe(Call::ENDED)->and(Call::sole()->vapi_call_id)->toBe('call_1');
+    expect(Call::sole()->status)->toBe(Call::ENDED);
 });
 
 it('explains a dropped call', function () {
-    callPage()->call('start')->dispatch('vapi-error', message: 'mic blocked')
+    callPage()->call('start')->dispatch('voice-error', message: 'mic blocked')
         ->assertSet('state', 'idle')->assertSee('The call dropped.');
 
     expect(Call::sole()->status)->toBe(Call::ENDED);
@@ -53,19 +53,19 @@ it('explains a dropped call', function () {
 it('shows why a call cannot start', function () {
     app(Entitlements::class)->consume($this->user, Metric::VoiceSeconds, 590);
 
-    callPage()->call('start')->assertSet('state', 'idle')->assertSee('used this month&#039;s call time', false)->assertNotDispatched('vapi-start');
+    callPage()->call('start')->assertSet('state', 'idle')->assertSee('used this month&#039;s call time', false)->assertNotDispatched('voice-start');
 });
 
 it('ignores call events before a call has started', function () {
-    callPage()->dispatch('vapi-connected')->dispatch('vapi-ended')->assertSet('state', 'ended');
+    callPage()->dispatch('voice-connected')->dispatch('voice-ended')->assertSet('state', 'ended');
 
     expect(Call::count())->toBe(0);
 });
 
 it('lists recent calls with their length', function () {
-    config(['services.vapi.webhook_secret' => 'shh']);
+    config(['services.voice.secret' => 'shh']);
     $call = app(Calling::class)->start($this->user, $this->entry);
-    app(Calling::class)->handleReport(['call' => ['assistantId' => $call->vapi_assistant_id], 'durationSeconds' => 130]);
+    app(Calling::class)->handleReport(['assistant' => ['id' => $call->voice_session_id], 'durationSeconds' => 130]);
 
     callPage()->assertSee('Recent calls')->assertSee('2 min');
 });

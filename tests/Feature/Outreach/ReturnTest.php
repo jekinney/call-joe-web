@@ -43,7 +43,7 @@ it('picks up a ringing call: the same call, and the contact says why they called
 
     $call = app(Calling::class)->start($this->user, $this->mom, $ringing);
 
-    $prompt = $this->voice->assistants[$call->vapi_assistant_id]['model']['messages'][0]['content'];
+    $prompt = $this->voice->sessions[$call->voice_session_id]['prompt'];
     expect($call->id)->toBe($ringing->id)
         ->and($call->only(['direction', 'status', 'max_seconds']))->toBe(['direction' => 'incoming', 'status' => 'starting', 'max_seconds' => Calling::MAX_SECONDS])
         ->and($prompt)->toContain("# This call\nYou called Jamie and they just picked up. Say hello and why you called: trying to call; worried.")
@@ -53,7 +53,7 @@ it('picks up a ringing call: the same call, and the contact says why they called
 it('says the contact called to catch up when there\'s no reason on file', function () {
     $call = app(Calling::class)->start($this->user, $this->mom, ringingCall(null));
 
-    expect($this->voice->assistants[$call->vapi_assistant_id]['model']['messages'][0]['content'])->toContain('why you called: to catch up.');
+    expect($this->voice->sessions[$call->voice_session_id]['prompt'])->toContain('why you called: to catch up.');
 });
 
 it('won\'t pick up a call that already ended, or someone else\'s', function () {
@@ -70,7 +70,7 @@ it('ends the worry with a call, and the contact is relieved on it', function () 
 
     $call = app(Calling::class)->start($this->user, $this->mom);
 
-    expect($this->voice->assistants[$call->vapi_assistant_id]['model']['messages'][0]['content'])
+    expect($this->voice->sessions[$call->voice_session_id]['prompt'])
         ->toContain('# Before this call')->toContain("you hadn't heard from Jamie in about 3 days")->toContain('thank goodness')
         ->and($this->mom->fresh()->only(['worry_stage', 'relief_stage']))->toBe(['worry_stage' => 0, 'relief_stage' => null]);
 });
@@ -113,7 +113,7 @@ it('answers from the call page, or turns the ring into a missed call when it can
     Volt::actingAs($this->user)->test('app.call', ['contact' => $this->mom->contact])->set('answer', $ringing->id)
         ->call('start')
         ->assertSet('state', 'connecting')->assertSet('answer', null)
-        ->assertDispatched('vapi-start', callId: $ringing->id);
+        ->assertDispatched('voice-start', callId: $ringing->id);
 
     app(Entitlements::class)->consume($this->user, Metric::VoiceSeconds, 300 * 60);
     $another = ringingCall();

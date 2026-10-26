@@ -53,7 +53,7 @@ it('starts out with Grok for texting, Claude for the careful jobs, and Gemini fo
         ->and($chosen(LlmPurpose::Memory)->only(['provider', 'model_id']))->toBe(['provider' => LlmProvider::Anthropic, 'model_id' => 'claude-sonnet-5-5'])
         ->and($chosen(LlmPurpose::Moderation)->only(['provider', 'model_id']))->toBe(['provider' => LlmProvider::Anthropic, 'model_id' => 'claude-haiku-5-5'])
         ->and($chosen(LlmPurpose::Scenes)->provider)->toBe(LlmProvider::Anthropic)
-        ->and($chosen(LlmPurpose::Voice)->only(['provider', 'model_id']))->toBe(['provider' => LlmProvider::Gemini, 'model_id' => 'gemini-3.5-flash-lite']);
+        ->and($chosen(LlmPurpose::Voice)->only(['provider', 'model_id']))->toBe(['provider' => LlmProvider::Gemini, 'model_id' => 'gemini-3.8-live']);
 });
 
 it('uses a contact\'s own brain for their texts', function () {
@@ -74,7 +74,7 @@ it('uses a contact\'s brain for texts only, not for memory, safety checks or pic
     expect(gateway()->modelFor(LlmPurpose::Memory, null, $joe)->model_id)->toBe('claude-sonnet-5-5')
         ->and(gateway()->modelFor(LlmPurpose::Moderation, null, $joe)->model_id)->toBe('claude-haiku-5-5')
         ->and(gateway()->modelFor(LlmPurpose::Scenes, null, $joe)->model_id)->toBe('claude-haiku-5-5')
-        ->and(gateway()->modelFor(LlmPurpose::Voice, null, $joe)->model_id)->toBe('gemini-3.5-flash-lite');
+        ->and(gateway()->modelFor(LlmPurpose::Voice, null, $joe)->model_id)->toBe('gemini-3.8-live');
 });
 
 it('falls back to the default model for a contact whose brain is missing or turned off', function () {
@@ -198,14 +198,14 @@ it('gives up when the backup fails too, or is turned off, or there is none', fun
 
 it('moves on to the fallback on another provider when a provider has no key', function () {
     app(LlmProviders::class)->fake(null); // the real clients, with whatever keys .env gives them
-    config(['services.gemini.key' => '', 'services.xai.key' => 'x-key', 'services.xai.base_url' => 'https://xai.test/v1']);
+    config(['services.anthropic.key' => '', 'services.xai.key' => 'x-key', 'services.xai.base_url' => 'https://xai.test/v1']);
     Http::fake(['xai.test/*' => Http::response(['choices' => [['message' => ['content' => 'Hello from Grok']]], 'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 4]])]);
 
-    $reply = gateway()->chat(LlmPurpose::Voice, hi()); // calls: Gemini first, then Grok
+    $reply = gateway()->chat(LlmPurpose::Scenes, hi()); // picture scenes: Claude first, then Grok
 
     expect($reply->text)->toBe('Hello from Grok')
         ->and(LlmCall::orderBy('id')->get()->map->only(['model', 'status', 'error'])->all())->toBe([
-            ['model' => 'gemini-3.5-flash-lite', 'status' => 'error', 'error' => 'No Gemini API key is set (GEMINI_API_KEY).'],
+            ['model' => 'claude-haiku-5-5', 'status' => 'error', 'error' => 'No Claude API key is set (ANTHROPIC_API_KEY).'],
             ['model' => GROK, 'status' => 'fallback', 'error' => null],
         ]);
 });
@@ -214,7 +214,7 @@ it('says so when no provider has a key', function () {
     app(LlmProviders::class)->fake(null);
     config(['services.anthropic.key' => '', 'services.gemini.key' => '', 'services.xai.key' => '', 'services.groq.key' => '']);
 
-    expect(fn () => gateway()->chat(LlmPurpose::Voice, hi()))->toThrow(LlmException::class, 'No Grok API key is set (XAI_API_KEY).');
+    expect(fn () => gateway()->chat(LlmPurpose::Scenes, hi()))->toThrow(LlmException::class, 'No Grok API key is set (XAI_API_KEY).');
 });
 
 it('works out cost in millionths of a dollar', function () {

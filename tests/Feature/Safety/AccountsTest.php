@@ -144,7 +144,7 @@ it('publishes the terms, privacy policy and AI disclosure', function (string $ro
 
 it('names the company on the terms and privacy pages, and 988 on the AI page', function () {
     $this->get(route('legal.terms'))->assertSee('120 Customs LLC')->assertSee(config('legal.contact_email'));
-    $this->get(route('legal.privacy'))->assertSee('Anthropic')->assertSee('Google')->assertSee('xAI')->assertSee('Vapi');
+    $this->get(route('legal.privacy'))->assertSee('Anthropic')->assertSee('Google')->assertSee('xAI')->assertSee('calls');
     $this->get(route('legal.ai'))->assertSee('988')->assertSee("they're an AI", false);
 });
 

@@ -162,7 +162,7 @@ it('explains what is missing when publishing too early, then publishes and hides
 
     editor($contact)->call('publish')->assertHasErrors('publish')->assertSee('still needs a picture, a voice and a brain');
 
-    $contact->forceFill(['avatar_path' => 'contacts/x.jpg', 'voice_provider_id' => 'v1', 'voice_settings' => ['provider' => 'vapi']])->save();
+    $contact->forceFill(['avatar_path' => 'contacts/x.jpg', 'voice' => 'Puck'])->save();
     editor($contact)->call('publish')->assertHasErrors('publish')->assertSee('still needs a brain');
 
     $contact->forceFill(['brain_id' => brainFor()])->save();
@@ -187,18 +187,16 @@ it('restores an earlier version from the history', function () {
     expect($contact->refresh()->version)->toBe(3);
 });
 
-it('sets a contact\'s voice, and needs both the provider and the voice id', function () {
+it('sets a contact\'s voice from Gemini\'s built-in voices', function () {
     $contact = Contact::factory()->create();
 
-    editor($contact)->set('voiceProvider', '11labs')->call('save')->assertHasErrors(['voiceId' => 'required_with']);
-    editor($contact)->set('voiceProvider', 'robot')->set('voiceId', 'x')->call('save')->assertHasErrors(['voiceProvider' => 'in']);
+    editor($contact)->set('voice', 'robot')->call('save')->assertHasErrors(['voice' => 'in']);
 
-    editor($contact)->set('voiceProvider', '11labs')->set('voiceId', 'voice-123')->call('save')->assertHasNoErrors();
-    expect($contact->refresh()->voice())->toBe(['provider' => '11labs', 'voiceId' => 'voice-123']);
+    editor($contact)->set('voice', 'Kore')->call('save')->assertHasNoErrors();
+    expect($contact->refresh()->voice)->toBe('Kore');
 
-    editor($contact)->assertSet('voiceProvider', '11labs')->assertSet('voiceId', 'voice-123')
-        ->set('voiceProvider', '')->set('voiceId', '')->call('save')->assertHasNoErrors();
-    expect($contact->refresh()->voice())->toBeNull();
+    editor($contact)->assertSet('voice', 'Kore')->set('voice', '')->call('save')->assertHasNoErrors();
+    expect($contact->refresh()->voice)->toBeNull();
 });
 
 it('is linked from the admin sidebar', function () {

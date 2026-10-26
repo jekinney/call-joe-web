@@ -23,8 +23,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string $gender
  * @property string $persona_md
  * @property string|null $looks
- * @property string|null $voice_provider_id
- * @property array<string, mixed>|null $voice_settings
+ * @property string|null $voice the name of one of Gemini's built-in voices, spoken on calls
  * @property string|null $avatar_path
  * @property int|null $required_plan_id
  * @property int|null $brain_id the model that writes their texts: chosen by whoever creates the contact, never by users
@@ -42,7 +41,7 @@ class Contact extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'slug', 'name', 'tagline', 'gender', 'persona_md', 'looks', 'voice_provider_id', 'voice_settings', 'required_plan_id', 'brain_id',
+        'slug', 'name', 'tagline', 'gender', 'persona_md', 'looks', 'voice', 'required_plan_id', 'brain_id',
     ];
 
     protected $attributes = [
@@ -53,7 +52,6 @@ class Contact extends Model
     protected function casts(): array
     {
         return [
-            'voice_settings' => 'array',
             'is_published' => 'boolean',
             'published_at' => 'datetime',
             'version' => 'integer',
@@ -115,22 +113,8 @@ class Contact extends Model
         return array_values(array_filter([
             trim($this->persona_md) === '' ? 'a persona' : null,
             $this->avatar_path ? null : 'a picture',
-            $this->voice() ? null : 'a voice',
+            $this->voice ? null : 'a voice',
             $this->brain_id ? null : 'a brain',
         ]));
-    }
-
-    /**
-     * The voice they speak with on calls (a Vapi voice provider and that provider's voice id), or null if none yet.
-     *
-     * @return array{provider: string, voiceId: string}|null
-     */
-    public function voice(): ?array
-    {
-        $provider = $this->voice_settings['provider'] ?? null;
-
-        return $this->voice_provider_id && is_string($provider) && $provider !== ''
-            ? ['provider' => $provider, 'voiceId' => $this->voice_provider_id]
-            : null;
     }
 }

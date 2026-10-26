@@ -13,8 +13,8 @@ use Illuminate\Support\Carbon;
  * @property int $user_contact_id
  * @property string $direction outgoing | incoming
  * @property string $status ringing | missed (incoming only) | starting | active | ended | failed
- * @property string|null $vapi_assistant_id
- * @property string|null $vapi_call_id
+ * @property string|null $voice_session_id the voice service's id for this call
+ * @property int|null $llm_model_id the live model the call used
  * @property string|null $prompt_hash none until it's answered
  * @property int $max_seconds
  * @property Carbon|null $started_at
@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $transcript
  * @property int|null $cost_micros
  * @property-read UserContact $userContact
+ * @property-read Llm|null $llmModel
  */
 class Call extends Model
 {
@@ -44,7 +45,7 @@ class Call extends Model
     public const INCOMING = 'incoming';
 
     protected $fillable = [
-        'user_contact_id', 'direction', 'status', 'vapi_assistant_id', 'vapi_call_id', 'prompt_hash', 'max_seconds',
+        'user_contact_id', 'direction', 'status', 'voice_session_id', 'llm_model_id', 'prompt_hash', 'max_seconds',
         'started_at', 'ended_at', 'duration_seconds', 'ended_reason', 'transcript', 'cost_micros',
     ];
 
@@ -60,6 +61,12 @@ class Call extends Model
     public function userContact(): BelongsTo
     {
         return $this->belongsTo(UserContact::class)->withTrashed();
+    }
+
+    /** @return BelongsTo<Llm, $this> */
+    public function llmModel(): BelongsTo
+    {
+        return $this->belongsTo(Llm::class);
     }
 
     public function isOver(): bool

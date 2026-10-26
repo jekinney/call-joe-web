@@ -98,12 +98,12 @@ it('drops a reach-out that crosses the line', function () {
 });
 
 it('notes a call where the user talked about hurting themselves', function () {
-    config(['services.vapi.webhook_secret' => 'shh']);
+    config(['services.voice.secret' => 'shh']);
     $call = app(Calling::class)->start($this->user, $this->entry);
 
     app(Calling::class)->handleReport([
-        'type' => 'end-of-call-report', 'call' => ['assistantId' => $call->vapi_assistant_id], 'durationSeconds' => 90,
-        'artifact' => ['transcript' => "AI: How are you holding up?\nUser: Not good. I've been thinking about suicide."],
+        'type' => 'end-of-call-report', 'assistant' => ['id' => $call->voice_session_id], 'durationSeconds' => 90,
+        'transcript' => "AI: How are you holding up?\nUser: Not good. I've been thinking about suicide.",
     ]);
 
     expect(Message::sole()->meta)->toEqual(['call_id' => $call->id, 'crisis' => 'self_harm'])

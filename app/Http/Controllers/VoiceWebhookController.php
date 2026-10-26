@@ -7,14 +7,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Reports from Vapi about calls (status updates and end-of-call reports). Each call's assistant sends our secret in a
- * header (see Calling::start); anything without it is refused.
+ * Reports from the voice service about calls (status updates and end-of-call reports). It sends our shared secret in a
+ * header; anything without it is refused.
  */
-class VapiWebhookController extends Controller
+class VoiceWebhookController extends Controller
 {
     public function __invoke(Request $request, Calling $calling): JsonResponse
     {
-        $secret = (string) config('services.vapi.webhook_secret');
+        $secret = (string) config('services.voice.secret');
         if ($secret === '' || ! hash_equals($secret, (string) $request->header(Calling::SECRET_HEADER))) {
             return response()->json(['error' => 'Not allowed.'], 401);
         }

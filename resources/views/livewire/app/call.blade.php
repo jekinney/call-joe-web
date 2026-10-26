@@ -52,19 +52,19 @@ new #[Title('Call')] class extends Component {
         $this->callId = $call->id;
         $this->state = 'connecting';
         // resources/js/voice.js starts the call in the browser.
-        $this->dispatch('vapi-start', publicKey: $calling->publicKey(), assistantId: $call->vapi_assistant_id, callId: $call->id);
+        $this->dispatch('voice-start', connectUrl: $calling->connectUrl($call), callId: $call->id);
     }
 
-    #[On('vapi-connected')]
-    public function connected(Calling $calling, ?string $vapiCallId = null): void
+    #[On('voice-connected')]
+    public function connected(Calling $calling): void
     {
         if ($call = $this->call()) {
-            $calling->connected($call, $vapiCallId);
+            $calling->connected($call);
             $this->state = 'active';
         }
     }
 
-    #[On('vapi-ended')]
+    #[On('voice-ended')]
     public function ended(Calling $calling): void
     {
         if ($call = $this->call()) {
@@ -73,7 +73,7 @@ new #[Title('Call')] class extends Component {
         $this->state = 'ended';
     }
 
-    #[On('vapi-error')]
+    #[On('voice-error')]
     public function failed(Calling $calling, string $message = ''): void
     {
         if ($call = $this->call()) {
@@ -85,7 +85,7 @@ new #[Title('Call')] class extends Component {
 
     public function hangUp(): void
     {
-        $this->dispatch('vapi-stop');
+        $this->dispatch('voice-stop');
     }
 
     private function call(): ?Call
@@ -109,7 +109,7 @@ new #[Title('Call')] class extends Component {
 }; ?>
 
 <div class="mx-auto flex w-full max-w-md flex-col items-center gap-6 py-6 text-center" x-data="{ talking: false, muted: false }"
-    x-on:vapi-speech.window="talking = $event.detail.talking" x-on:vapi-muted.window="muted = $event.detail.muted">
+    x-on:voice-speech.window="talking = $event.detail.talking" x-on:voice-muted.window="muted = $event.detail.muted">
     <a href="{{ route('app.chat', $contact) }}" class="self-start text-sm" wire:navigate>← {{ __('Texts') }}</a>
     @if ($answer)
         <div wire:init="start" data-answering></div>
@@ -140,7 +140,7 @@ new #[Title('Call')] class extends Component {
         @if (in_array($state, ['idle', 'ended'], true))
             <flux:button variant="primary" icon="phone" wire:click="start" class="rounded-full! px-6">{{ $state === 'ended' ? __('Call again') : __('Call') }}</flux:button>
         @else
-            <flux:button icon="microphone" x-on:click="window.dispatchEvent(new CustomEvent('vapi-toggle-mute'))" x-text="muted ? '{{ __('Unmute') }}' : '{{ __('Mute') }}'">{{ __('Mute') }}</flux:button>
+            <flux:button icon="microphone" x-on:click="window.dispatchEvent(new CustomEvent('voice-toggle-mute'))" x-text="muted ? '{{ __('Unmute') }}' : '{{ __('Mute') }}'">{{ __('Mute') }}</flux:button>
             <flux:button variant="danger" icon="phone-x-mark" wire:click="hangUp" class="rounded-full! px-6">{{ __('Hang up') }}</flux:button>
         @endif
     </div>

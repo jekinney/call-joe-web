@@ -62,10 +62,15 @@ class ContactSeeder extends Seeder
 
         // Their brains: Joe is a lower-tier contact on a cheap Gemini, Maya thinks on Grok.
         $brains = ['joe-tucker' => 'gemini-3.5-flash-lite', 'maya-brooks' => 'grok-4.20-0309-non-reasoning'];
+        // Their voices on calls: two of Gemini's built-in voices.
+        $voices = ['joe-tucker' => 'Charon', 'maya-brooks' => 'Kore'];
 
         foreach ($samples as $sample) {
             if (! Contact::withTrashed()->where('slug', $sample['slug'])->exists()) {
-                $catalog->create($sample + ['brain_id' => Llm::where('purpose', 'chat')->where('model_id', $brains[$sample['slug']])->value('id')]);
+                $catalog->create($sample + [
+                    'brain_id' => Llm::where('purpose', 'chat')->where('model_id', $brains[$sample['slug']])->value('id'),
+                    'voice' => $voices[$sample['slug']],
+                ]);
             }
         }
     }

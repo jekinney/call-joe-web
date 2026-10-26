@@ -27,7 +27,7 @@ function relative(string $relationship, string $gender = 'woman', bool $voice = 
 {
     $contact = Contact::factory()->published()->create(['gender' => $gender]);
     if (! $voice) {
-        $contact->forceFill(['voice_provider_id' => null])->save();
+        $contact->forceFill(['voice' => null])->save();
     }
 
     return app(Phonebook::class)->add(test()->user, $contact, Relationship::bySlug($relationship));

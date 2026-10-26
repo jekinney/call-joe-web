@@ -57,14 +57,13 @@ return [
         'timeout' => (int) env('GROQ_TIMEOUT', 30),
     ],
 
-    // Voice calls (App\Support\Voice\VapiClient). The webhook URL must be reachable from the internet (in development,
-    // through a tunnel such as ngrok); the secret is sent by Vapi with every report.
-    'vapi' => [
-        'private_key' => env('VAPI_PRIVATE_KEY', ''),
-        'public_key' => env('VAPI_PUBLIC_KEY', ''),
-        'base_url' => env('VAPI_BASE_URL', 'https://api.vapi.ai'),
-        'webhook_url' => env('VAPI_WEBHOOK_URL') ?: rtrim((string) env('APP_URL', 'http://localhost'), '/').'/webhooks/vapi',
-        'webhook_secret' => env('VAPI_WEBHOOK_SECRET', ''),
+    // Voice calls (App\Support\Voice\PipecatClient): our own voice service in voice/, speaking with Gemini Live.
+    // `url` is where Laravel reaches it; `public_url` is where the browser connects (they differ when Laravel runs in
+    // Docker and the service runs on the host). The secret is shared both ways (sessions in, reports out).
+    'voice' => [
+        'url' => env('VOICE_URL', 'http://host.docker.internal:8787'),
+        'public_url' => env('VOICE_PUBLIC_URL', 'http://localhost:8787'),
+        'secret' => env('VOICE_SECRET', ''),
     ],
 
     'slack' => [

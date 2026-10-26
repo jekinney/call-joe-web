@@ -126,7 +126,7 @@ class Outreach
         if ($this->isDue($entry, OutreachEvent::TEXT, $worry['texts_per_day'], self::MAX_UNANSWERED_TEXTS + $worry['stage'] - 1)) {
             $planned[] = $this->schedule($entry, OutreachEvent::TEXT, $worry['stage'], $worry['tone']);
         }
-        if ($entry->contact->voice() !== null && $this->isDue($entry, OutreachEvent::CALL, $worry['calls_per_day'])) {
+        if ($entry->contact->voice !== null && $this->isDue($entry, OutreachEvent::CALL, $worry['calls_per_day'])) {
             $planned[] = $this->schedule($entry, OutreachEvent::CALL, $worry['stage'], $worry['tone']);
         }
 
