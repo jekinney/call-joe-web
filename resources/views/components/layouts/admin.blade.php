@@ -14,7 +14,7 @@
             </a>
 
             <flux:navlist variant="outline">
-                <flux:navlist.group :heading="__('Admin')" class="grid">
+                <flux:navlist.group :heading="__('Admin')" class="grid [&_a]:py-2.5 [&_a]:text-base">
                     @can('overview.view')
                         <flux:navlist.item icon="home" :href="route('admin.home')" :current="request()->routeIs('admin.home')" wire:navigate>{{ __('Overview') }}</flux:navlist.item>
                     @endcan
@@ -44,11 +44,11 @@
 
             <flux:spacer />
 
-            <flux:navlist variant="outline">
+            <flux:navlist variant="outline" class="[&_a]:py-2.5 [&_a]:text-base">
                 <flux:navlist.item icon="arrow-left" :href="route('app.home')" wire:navigate>{{ __('Back to the app') }}</flux:navlist.item>
             </flux:navlist>
 
-            <flux:text size="xs" class="px-2" data-version>{{ __('Version :v', ['v' => config('app.version')]) }}</flux:text>
+            <flux:text size="sm" class="px-2" data-version>{{ __('Version :v', ['v' => config('app.version')]) }}</flux:text>
 
             <form method="POST" action="{{ route('logout') }}" class="w-full">
                 @csrf
@@ -62,7 +62,13 @@
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
         </flux:header>
 
-        <flux:main>
+        {{-- Flux's small and extra-small text is too small for a working screen: everything in the admin area goes up one step. --}}
+        <style>
+            .admin-area .text-sm, .admin-area [data-flux-text] { font-size: 1rem; line-height: 1.5rem; }
+            .admin-area .text-xs, .admin-area [data-flux-text].text-xs { font-size: 0.875rem; line-height: 1.25rem; }
+        </style>
+
+        <flux:main class="admin-area">
             {{ $slot }}
         </flux:main>
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminPictureController;
 use App\Http\Controllers\BraintreeWebhookController;
 use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\DeclineCallController;
@@ -73,6 +74,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'can:adm
     Volt::route('models', 'admin.models')->middleware('can:models.manage')->name('models');
     Volt::route('moderation', 'admin.moderation')->middleware('can:safety.review')->name('moderation');
     Volt::route('pictures', 'admin.pictures')->middleware('can:pictures.manage')->name('pictures');
+    Route::get('pictures/file/{image}', AdminPictureController::class)->middleware('can:pictures.manage')->name('pictures.file');
+    Volt::route('pictures/{contactId}', 'admin.pictures.contact')->whereNumber('contactId')->middleware('can:pictures.manage')->name('pictures.contact');
     Volt::route('roles', 'admin.roles')->middleware('can:roles.manage')->name('roles');
 });
 
