@@ -74,14 +74,32 @@ services:
     reverb:
         <<: *app
         command: ['php', 'artisan', 'reverb:start', '--host=0.0.0.0', '--port=8080']
+        # Not a web server: skip the web image's health check, and wait for the app (it runs the migrations at start).
+        healthcheck:
+            disable: true
+        depends_on:
+            app:
+                condition: service_healthy
 
     queue:
         <<: *app
         command: ['php', 'artisan', 'queue:work', '--tries=3', '--sleep=1', '--max-time=3600']
+        # Not a web server: skip the web image's health check, and wait for the app (it runs the migrations at start).
+        healthcheck:
+            disable: true
+        depends_on:
+            app:
+                condition: service_healthy
 
     scheduler:
         <<: *app
         command: ['php', 'artisan', 'schedule:work']
+        # Not a web server: skip the web image's health check, and wait for the app (it runs the migrations at start).
+        healthcheck:
+            disable: true
+        depends_on:
+            app:
+                condition: service_healthy
 
     voice:
         build:
