@@ -10,9 +10,7 @@ use App\Http\Controllers\VoiceWebhookController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
-Route::get('/', function () {
-    return view('welcome');
-})->name('home');
+Volt::route('/', 'landing')->name('home');
 
 // The voice service's call reports (checked by a secret header; no session or CSRF token).
 Route::post('webhooks/voice', VoiceWebhookController::class)->middleware('throttle:120,1')->name('webhooks.voice');
