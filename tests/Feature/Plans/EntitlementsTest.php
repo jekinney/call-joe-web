@@ -79,8 +79,9 @@ it('turns features and settings on by plan', function () {
 
     entitlements()->assignPlan($user, paidPlan(), null);
 
-    expect(entitlements()->can($user, Feature::RatedR))->toBeTrue()
-        ->and(entitlements()->can($user, Feature::Videos))->toBeTrue()
+    expect(entitlements()->can($user, Feature::Voicemail))->toBeTrue()
+        ->and(entitlements()->can($user, Feature::RatedR))->toBeFalse() // not promised: the web app is never explicit
+        ->and(entitlements()->can($user, Feature::Videos))->toBeFalse() // not promised: held back for cost
         ->and(entitlements()->setting($user, 'contacts'))->toBe(25)
         ->and(entitlements()->setting($user, 'llm_tier'))->toBe('large')
         ->and(entitlements()->setting($user, 'missing', 'fallback'))->toBe('fallback');

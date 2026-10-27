@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Gate;
 use App\Enums\LlmProvider;
 use App\Enums\LlmPurpose;
 use App\Exceptions\LlmException;
@@ -36,6 +37,7 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
 
     public function create(): void
     {
+        Gate::authorize('models.manage');
         $this->reset(['editingId', 'model_id', 'label', 'plan_tier', 'fallback_id', 'fast_thinking', 'input_cents_per_mtok', 'output_cents_per_mtok', 'max_tokens', 'sort']);
         $this->purpose = 'chat';
         $this->provider = 'anthropic';
@@ -44,6 +46,7 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
 
     public function edit(int $id): void
     {
+        Gate::authorize('models.manage');
         $model = Llm::findOrFail($id);
         $this->editingId = $model->id;
         $this->provider = $model->provider->value;
@@ -62,6 +65,7 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
 
     public function save(LlmGateway $gateway): void
     {
+        Gate::authorize('models.manage');
         $data = $this->validate([
             'provider' => ['required', Rule::enum(LlmProvider::class)],
             'model_id' => ['required', 'string', 'max:120'],
@@ -86,6 +90,7 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
 
     public function toggle(int $id, LlmGateway $gateway): void
     {
+        Gate::authorize('models.manage');
         $model = Llm::findOrFail($id);
         $model->update(['is_active' => ! $model->is_active]);
         $gateway->forgetModels();
@@ -94,7 +99,16 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
     /** Sends a short test message to this model alone (no fallback, so a problem shows), and shows the answer. */
     public function test(int $id, LlmGateway $gateway): void
     {
+        Gate::authorize('models.manage');
         $model = Llm::findOrFail($id);
+
+        // A live voice model only talks over a streaming connection, so a text message would always fail.
+        if ($model->purpose === LlmPurpose::Voice) {
+            $this->tests[$id] = ['ok' => true, 'text' => __('Live voice models can\'t be tested with a text. Make a call to try it.')];
+
+            return;
+        }
+
         $started = microtime(true);
 
         try {
@@ -220,7 +234,9 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
                             @endif
                         </div>
                         <div class="flex gap-2">
-                            <flux:button size="sm" wire:click="test({{ $model->id }})">{{ __('Test') }}</flux:button>
+                            @if ($model->purpose !== LlmPurpose::Voice)
+                                <flux:button size="sm" wire:click="test({{ $model->id }})">{{ __('Test') }}</flux:button>
+                            @endif
                             <flux:button size="sm" wire:click="edit({{ $model->id }})">{{ __('Edit') }}</flux:button>
                             <flux:button size="sm" wire:click="toggle({{ $model->id }})">{{ $model->is_active ? __('Turn off') : __('Turn on') }}</flux:button>
                         </div>
