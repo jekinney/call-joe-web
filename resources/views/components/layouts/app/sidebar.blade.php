@@ -31,7 +31,7 @@
 
             @can('admin')
                 <flux:navlist variant="outline">
-                    <flux:navlist.item icon="shield-check" :href="route('admin.home')" wire:navigate>{{ __('Admin') }}</flux:navlist.item>
+                    <flux:navlist.item icon="shield-check" :href="route(auth()->user()->adminHome())" wire:navigate>{{ __('Admin') }}</flux:navlist.item>
                 </flux:navlist>
             @endcan
 

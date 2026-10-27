@@ -135,8 +135,17 @@ it('checks every picture prompt: no minors, no real people, explicit only with R
     'a minor' => ['paid', 'minors', true, 1],
     'a real person' => ['paid', 'real_person', true, 0],
     'explicit on Free' => ['free', 'explicit', true, 0],
-    'explicit with Rated R' => ['paid', 'explicit', false, 0],
+    'explicit on Paid' => ['paid', 'explicit', true, 0], // no shipped plan includes Rated R
 ]);
+
+it('lets explicit pictures through only on a plan that has Rated R', function () {
+    $limits = Plan::where('slug', 'paid')->firstOrFail()->limits;
+    $limits['features']['rated_r'] = true;
+    app(Entitlements::class)->assignPlan($this->user, Plan::factory()->create(['limits' => $limits]), null);
+    classifierSays('explicit');
+
+    expect(moderator()->checkImagePrompt($this->user, 'Maya at the beach')->blocked)->toBeFalse();
+});
 
 it('makes no picture when the classifier can\'t answer', function () {
     $this->llm->reply('no idea');
