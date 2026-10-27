@@ -84,3 +84,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how the code is kept tested and tidy.
 ## License
 
 Copyright © 2026 120 Customs LLC. All rights reserved. See [LICENSE](LICENSE).
+
+Deploying to DigitalOcean: see [docs/deploying.md](docs/deploying.md).

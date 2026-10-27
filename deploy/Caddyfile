@@ -1,0 +1,24 @@
+# The front door: HTTPS (automatic once SITE_ADDRESS is a domain name), the website, Reverb and the voice service.
+# SITE_ADDRESS=:80 serves plain HTTP on the server's IP for a first look (browsers won't allow microphones over HTTP).
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# Real-time WebSocket (Reverb listens at /app/<key>, so only upgrade requests go there).
+	@reverb {
+		path /app/*
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	handle @reverb {
+		reverse_proxy reverb:8080
+	}
+
+	# The voice service: /voice/sessions, /voice/api/offer, ... (the /voice prefix is removed).
+	handle_path /voice/* {
+		reverse_proxy host.docker.internal:8787
+	}
+
+	handle {
+		reverse_proxy app:8080
+	}
+}
