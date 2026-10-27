@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -32,7 +33,7 @@ class OwnerSeeder extends Seeder
             'name' => $owner['name'] ?: 'Owner',
             'timezone' => $owner['timezone'] ?: 'UTC',
             'date_of_birth' => $owner['birth_date'] ?: $user->date_of_birth,
-            'is_admin' => true,
+            'role_id' => Role::owner()->id,
             'email_verified_at' => $user->email_verified_at ?? now(),
             'terms_accepted_at' => now(),
             'terms_version' => config('legal.terms_version'),

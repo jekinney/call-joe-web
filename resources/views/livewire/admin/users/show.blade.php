@@ -1,7 +1,10 @@
 <?php
 
+use Illuminate\Support\Facades\Gate;
 use App\Enums\Metric;
+use App\Enums\Permission;
 use App\Models\Plan;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\Entitlements;
 use Illuminate\Support\Carbon;
@@ -22,6 +25,7 @@ new #[Layout('components.layouts.admin'), Title('User')] class extends Component
     {
         $this->user = $user;
         $this->planId = $entitlements->planFor($user)->id;
+        $this->roleId = $user->role_id;
         $this->expiresOn = $user->plan_id ? ($user->plan_expires_at?->timezone($user->timezone)->toDateString() ?? '') : '';
     }
 
@@ -30,6 +34,7 @@ new #[Layout('components.layouts.admin'), Title('User')] class extends Component
      */
     public function savePlan(Entitlements $entitlements): void
     {
+        Gate::authorize('users.plan');
         $this->validate([
             'planId' => ['required', 'integer', 'exists:plans,id'],
             'expiresOn' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:today'],
@@ -46,11 +51,43 @@ new #[Layout('components.layouts.admin'), Title('User')] class extends Component
         $this->dispatch('plan-saved');
     }
 
+    public ?int $roleId = null;
+
+    /**
+     * Make them an admin with a role, or a regular user again (empty). The Owner role only comes from the command line,
+     * nobody changes their own role or an owner's, and a role can't carry permissions the giver lacks.
+     */
+    public function saveRole(): void
+    {
+        Gate::authorize('roles.manage');
+        $this->validate(['roleId' => ['nullable', 'integer', function (string $attribute, mixed $value, Closure $fail) {
+            if (! Role::whereKey($value)->where('is_owner', false)->exists()) {
+                $fail(__('Pick one of the listed roles.'));
+            }
+        }]]);
+        abort_if($this->user->is(auth()->user()), 422, 'You can\'t change your own role.');
+        abort_if($this->user->isOwner(), 403, 'An owner\'s role is changed on the command line.');
+
+        if ($this->roleId !== null) {
+            $missing = collect(Role::findOrFail($this->roleId)->permissions)
+                ->reject(fn (string $value) => ($permission = Permission::tryFrom($value)) === null || auth()->user()->hasPermission($permission));
+            if ($missing->isNotEmpty()) {
+                $this->addError('roleId', __('That role allows things you can\'t allow yourself.'));
+
+                return;
+            }
+        }
+
+        $this->user->forceFill(['role_id' => $this->roleId])->save();
+        $this->dispatch('role-saved');
+    }
+
     public string $suspendReason = '';
 
     /** Shut the account out of /app (an admin can't suspend themselves). */
     public function suspend(): void
     {
+        Gate::authorize('users.suspend');
         $this->validate(['suspendReason' => ['required', 'string', 'max:200']]);
         abort_if($this->user->is(auth()->user()), 422, 'You can\'t suspend yourself.');
 
@@ -60,6 +97,7 @@ new #[Layout('components.layouts.admin'), Title('User')] class extends Component
 
     public function unsuspend(): void
     {
+        Gate::authorize('users.suspend');
         $this->user->unsuspend();
     }
 
@@ -70,6 +108,7 @@ new #[Layout('components.layouts.admin'), Title('User')] class extends Component
     {
         return [
             'plans' => Plan::orderBy('sort')->get(),
+            'roles' => Role::where('is_owner', false)->orderBy('name')->get(),
             'current' => $entitlements->planFor($this->user),
             'usage' => collect(Metric::cases())->map(fn (Metric $metric) => [
                 'metric' => $metric,
@@ -88,6 +127,7 @@ new #[Layout('components.layouts.admin'), Title('User')] class extends Component
         <flux:text>{{ $user->email }} · {{ __('joined :date', ['date' => $user->created_at?->toFormattedDateString()]) }} · {{ $user->timezone }}</flux:text>
     </div>
 
+    @can('users.plan')
     <section class="flex flex-col gap-4">
         <flux:heading size="lg">{{ __('Plan') }}</flux:heading>
         <flux:text>{{ __('Now on :plan.', ['plan' => $current->name]) }}</flux:text>
@@ -105,7 +145,34 @@ new #[Layout('components.layouts.admin'), Title('User')] class extends Component
             </div>
         </form>
     </section>
+    @endcan
 
+    @can('roles.manage')
+        <section class="flex flex-col gap-4" data-role-section>
+            <flux:heading size="lg">{{ __('Admin role') }}</flux:heading>
+            @if ($user->isOwner())
+                <flux:text>{{ __('Owner. Changed on the command line only.') }}</flux:text>
+            @elseif ($user->is(auth()->user()))
+                <flux:text>{{ $user->role?->name ?? __('No role.') }} {{ __('You can\'t change your own role.') }}</flux:text>
+            @else
+                <form wire:submit="saveRole" class="flex flex-col gap-4">
+                    <flux:select wire:model="roleId" :label="__('Role')" :description="__('No role means a regular user; their tier is their plan.')">
+                        <flux:select.option value="">{{ __('No role (regular user)') }}</flux:select.option>
+                        @foreach ($roles as $role)
+                            <flux:select.option :value="$role->id">{{ $role->name }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                    <flux:error name="roleId" />
+                    <div class="flex items-center gap-4">
+                        <flux:button type="submit" variant="primary">{{ __('Save role') }}</flux:button>
+                        <x-action-message on="role-saved">{{ __('Saved.') }}</x-action-message>
+                    </div>
+                </form>
+            @endif
+        </section>
+    @endcan
+
+    @can('users.suspend')
     <section class="flex flex-col gap-4" data-safety>
         <flux:heading size="lg">{{ __('Safety') }}</flux:heading>
         <flux:text>
@@ -128,6 +195,7 @@ new #[Layout('components.layouts.admin'), Title('User')] class extends Component
             </form>
         @endif
     </section>
+    @endcan
 
     <section class="flex flex-col gap-2">
         <flux:heading size="lg">{{ __('Usage this period') }}</flux:heading>

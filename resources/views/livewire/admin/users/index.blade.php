@@ -28,7 +28,7 @@ new #[Layout('components.layouts.admin'), Title('Users')] class extends Componen
 
         return [
             'users' => User::query()
-                ->with('plan')
+                ->with(['plan', 'role'])
                 ->when($term !== '', fn ($q) => $q->where(fn ($q) => $q
                     ->whereLike('name', "%{$term}%", caseSensitive: false)
                     ->orWhereLike('email', "%{$term}%", caseSensitive: false)))
@@ -56,8 +56,8 @@ new #[Layout('components.layouts.admin'), Title('Users')] class extends Componen
                 <flux:table.row :key="$user->id">
                     <flux:table.cell>
                         <a href="{{ route('admin.users.show', $user) }}" class="font-medium underline-offset-2 hover:underline" wire:navigate>{{ $user->name }}</a>
-                        @if ($user->is_admin)
-                            <flux:badge color="amber" size="sm">{{ __('Admin') }}</flux:badge>
+                        @if ($user->role)
+                            <flux:badge color="amber" size="sm">{{ $user->role->name }}</flux:badge>
                         @endif
                     </flux:table.cell>
                     <flux:table.cell>{{ $user->email }}</flux:table.cell>
