@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Gate;
 use App\Models\Contact;
 use App\Models\ImageCacheEntry;
 use App\Models\ImageRequest;
@@ -17,6 +18,7 @@ new #[Layout('components.layouts.admin'), Title('Pictures')] class extends Compo
 
     public function purge(int $contactId, PictureCache $cache): void
     {
+        Gate::authorize('pictures.manage');
         $contact = Contact::withTrashed()->findOrFail($contactId);
         $count = $cache->purge($contact);
         $this->purged = trans_choice(':name: :count cached picture forgotten.|:name: :count cached pictures forgotten.', $count, ['name' => $contact->name, 'count' => $count]);

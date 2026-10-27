@@ -61,18 +61,19 @@ Route::prefix('app/settings')->middleware(['auth'])->group(function () {
     Route::get('data/export', DataExportController::class)->middleware('throttle:5,1')->name('settings.data.export');
 });
 
-// Running the service: admins only.
+// Running the service: admins only, and each page needs the permission from the admin's role (App\Enums\Permission).
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'can:admin'])->group(function () {
-    Volt::route('/', 'admin.home')->name('home');
-    Volt::route('users', 'admin.users.index')->name('users.index');
-    Volt::route('users/{user}', 'admin.users.show')->name('users.show');
-    Volt::route('contacts', 'admin.contacts.index')->name('contacts.index');
-    Volt::route('contacts/new', 'admin.contacts.edit')->name('contacts.create');
-    Volt::route('contacts/{contact}', 'admin.contacts.edit')->name('contacts.edit');
-    Volt::route('prompt-preview', 'admin.prompt-preview')->name('prompt-preview');
-    Volt::route('models', 'admin.models')->name('models');
-    Volt::route('moderation', 'admin.moderation')->name('moderation');
-    Volt::route('pictures', 'admin.pictures')->name('pictures');
+    Volt::route('/', 'admin.home')->middleware('can:overview.view')->name('home');
+    Volt::route('users', 'admin.users.index')->middleware('can:users.view')->name('users.index');
+    Volt::route('users/{user}', 'admin.users.show')->middleware('can:users.view')->name('users.show');
+    Volt::route('contacts', 'admin.contacts.index')->middleware('can:contacts.manage')->name('contacts.index');
+    Volt::route('contacts/new', 'admin.contacts.edit')->middleware('can:contacts.manage')->name('contacts.create');
+    Volt::route('contacts/{contact}', 'admin.contacts.edit')->middleware('can:contacts.manage')->name('contacts.edit');
+    Volt::route('prompt-preview', 'admin.prompt-preview')->middleware('can:prompts.view')->name('prompt-preview');
+    Volt::route('models', 'admin.models')->middleware('can:models.manage')->name('models');
+    Volt::route('moderation', 'admin.moderation')->middleware('can:safety.review')->name('moderation');
+    Volt::route('pictures', 'admin.pictures')->middleware('can:pictures.manage')->name('pictures');
+    Volt::route('roles', 'admin.roles')->middleware('can:roles.manage')->name('roles');
 });
 
 require __DIR__.'/auth.php';

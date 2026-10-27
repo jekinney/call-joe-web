@@ -77,13 +77,13 @@ class DataRights
      * Deletes the account and everything under it: contacts, texts, calls, memory, pictures and payment records. A
      * subscription that is still charging is canceled first, so nobody is billed for an account that is gone.
      *
-     * @throws DomainException when they are the only admin.
+     * @throws DomainException when they are the only owner.
      * @throws PaymentException when the subscription could not be canceled (nothing is deleted then).
      */
     public function erase(User $user): void
     {
-        if ($user->is_admin && User::where('is_admin', true)->whereKeyNot($user->id)->doesntExist()) {
-            throw new DomainException('You are the only admin; make someone else an admin first.');
+        if ($user->isOwner() && User::whereHas('role', fn ($roles) => $roles->where('is_owner', true))->whereKeyNot($user->id)->doesntExist()) {
+            throw new DomainException('You are the only owner; make someone else an owner first.');
         }
 
         if ($this->billing->current($user)?->isRenewing()) {
