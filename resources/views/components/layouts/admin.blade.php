@@ -62,7 +62,13 @@
             <flux:sidebar.toggle class="lg:hidden" icon="bars-2" inset="left" />
         </flux:header>
 
-        <flux:main>
+        {{-- Flux's small and extra-small text is too small for a working screen: everything in the admin area goes up one step. --}}
+        <style>
+            .admin-area .text-sm, .admin-area [data-flux-text] { font-size: 1rem; line-height: 1.5rem; }
+            .admin-area .text-xs, .admin-area [data-flux-text].text-xs { font-size: 0.875rem; line-height: 1.25rem; }
+        </style>
+
+        <flux:main class="admin-area">
             {{ $slot }}
         </flux:main>
 
