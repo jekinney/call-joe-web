@@ -1,0 +1,130 @@
+# Production on one server (see docs/deploying.md). Start with: docker compose -f compose.prod.yaml --env-file .env up -d --build
+# Everything reads the server's .env (copy .env.production.example). Never use this file on a laptop: use compose.yaml.
+
+x-app: &app
+    build:
+        context: .
+        dockerfile: deploy/Dockerfile
+        args:
+            VITE_REVERB_APP_KEY: '${REVERB_APP_KEY}'
+            VITE_REVERB_HOST: '${VITE_REVERB_HOST}'
+            VITE_REVERB_PORT: '${VITE_REVERB_PORT:-443}'
+            VITE_REVERB_SCHEME: '${VITE_REVERB_SCHEME:-https}'
+    image: call-joe-web:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+        APP_ENV: production
+        APP_DEBUG: 'false'
+        DB_HOST: pgsql
+        REDIS_HOST: valkey
+        REVERB_HOST: reverb
+        REVERB_PORT: 8080
+        REVERB_SCHEME: http
+        VOICE_URL: 'http://host.docker.internal:8787'
+        AUTORUN_ENABLED: 'false'
+    extra_hosts:
+        - 'host.docker.internal:host-gateway'
+    volumes:
+        - 'app-storage:/var/www/html/storage/app'
+        - 'app-logs:/var/www/html/storage/logs'
+    depends_on:
+        pgsql:
+            condition: service_healthy
+        valkey:
+            condition: service_healthy
+
+services:
+    caddy:
+        image: 'caddy:2'
+        restart: unless-stopped
+        ports:
+            - '80:80'
+            - '443:443'
+            - '443:443/udp'
+        environment:
+            SITE_ADDRESS: '${SITE_ADDRESS:-:80}'
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        volumes:
+            - './deploy/Caddyfile:/etc/caddy/Caddyfile:ro'
+            - 'caddy-data:/data'
+            - 'caddy-config:/config'
+        depends_on:
+            - app
+            - reverb
+
+    app:
+        <<: *app
+        # Web server. Runs the migrations at start (safe to repeat).
+        environment:
+            APP_ENV: production
+            APP_DEBUG: 'false'
+            DB_HOST: pgsql
+            REDIS_HOST: valkey
+            REVERB_HOST: reverb
+            REVERB_PORT: 8080
+            REVERB_SCHEME: http
+            VOICE_URL: 'http://host.docker.internal:8787'
+            AUTORUN_ENABLED: 'true'
+            AUTORUN_LARAVEL_MIGRATION_ISOLATION: 'true'
+            AUTORUN_LARAVEL_STORAGE_LINK: 'true'
+            PHP_OPCACHE_ENABLE: '1'
+
+    reverb:
+        <<: *app
+        command: ['php', 'artisan', 'reverb:start', '--host=0.0.0.0', '--port=8080']
+
+    queue:
+        <<: *app
+        command: ['php', 'artisan', 'queue:work', '--tries=3', '--sleep=1', '--max-time=3600']
+
+    scheduler:
+        <<: *app
+        command: ['php', 'artisan', 'schedule:work']
+
+    voice:
+        build:
+            context: .
+            dockerfile: deploy/voice.Dockerfile
+        restart: unless-stopped
+        # Host networking: the browser reaches this over UDP directly (open UDP 32768-60999 in the firewall).
+        network_mode: host
+        environment:
+            GEMINI_API_KEY: '${GEMINI_API_KEY}'
+            VOICE_SECRET: '${VOICE_SECRET}'
+            VOICE_ALLOWED_ORIGINS: '${APP_URL}'
+
+    pgsql:
+        image: 'postgres:18-alpine'
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: '${DB_DATABASE}'
+            POSTGRES_USER: '${DB_USERNAME}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD}'
+        volumes:
+            - 'pgsql-data:/var/lib/postgresql'
+        healthcheck:
+            test: ['CMD', 'pg_isready', '-q', '-d', '${DB_DATABASE}', '-U', '${DB_USERNAME}']
+            interval: 10s
+            retries: 5
+            timeout: 5s
+
+    valkey:
+        image: 'valkey/valkey:alpine'
+        restart: unless-stopped
+        volumes:
+            - 'valkey-data:/data'
+        healthcheck:
+            test: ['CMD', 'valkey-cli', 'ping']
+            interval: 10s
+            retries: 5
+            timeout: 5s
+
+volumes:
+    app-storage:
+    app-logs:
+    caddy-data:
+    caddy-config:
+    pgsql-data:
+    valkey-data:
