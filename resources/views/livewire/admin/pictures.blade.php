@@ -76,7 +76,13 @@ new #[Layout('components.layouts.admin'), Title('Pictures')] class extends Compo
                 @forelse ($top as $row)
                     <flux:table.row :key="$row->cache_key">
                         <flux:table.cell><a href="{{ route('admin.pictures.contact', $row->contact_id) }}" class="underline-offset-2 hover:underline" wire:navigate>{{ $row->contact->name }}</a></flux:table.cell>
-                        <flux:table.cell class="max-w-md whitespace-normal font-mono text-xs">{{ $row->scene_signature }}</flux:table.cell>
+                        <flux:table.cell class="max-w-md whitespace-normal">
+                            <div class="flex flex-wrap gap-1" data-scene>
+                                @foreach ($row->sceneLabels() as $label => $value)
+                                    <flux:badge size="sm" color="zinc"><span class="opacity-60">{{ __($label) }}:</span> {{ $value }}</flux:badge>
+                                @endforeach
+                            </div>
+                        </flux:table.cell>
                         <flux:table.cell>{{ $row->variants }}</flux:table.cell>
                         <flux:table.cell>{{ $row->hits }}</flux:table.cell>
                     </flux:table.row>

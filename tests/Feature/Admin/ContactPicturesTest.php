@@ -48,16 +48,40 @@ it('says so when a contact has no cached pictures, and works for a deleted conta
     $this->actingAs($this->admin)->get(route('admin.pictures.contact', $this->maya->id))->assertOk()->assertSee('Maya Brooks');
 });
 
-it('pages through a long library', function () {
-    foreach (range(1, 30) as $n) {
-        cachedPicture($this->maya, "scene number {$n}");
-    }
+it('shows the scene as labels, not JSON', function () {
+    cachedPicture($this->maya, '{"subject":"lunch","setting":"cafe","action":"","outfit":"red scarf","time_of_day":"noon"}');
+    cachedPicture($this->maya, 'words:lake sunset');
 
     Volt::actingAs($this->admin)->test('admin.pictures.contact', ['contactId' => $this->maya->id])
-        ->assertSee('30 pictures')
-        ->assertSee('scene number 30')->assertDontSee('scene number 1 ')
-        ->call('nextPage')
-        ->assertSee('scene number 1')->assertDontSee('scene number 30');
+        ->assertSee('lunch · cafe · red scarf · noon')
+        ->assertSee('lake sunset')
+        ->assertDontSee('"subject"')
+        ->assertDontSee('words:');
+
+    expect(ImageCacheEntry::where('scene_signature', 'like', '{%')->first()->sceneLabels())
+        ->toBe(['Subject' => 'lunch', 'Setting' => 'cafe', 'Outfit' => 'red scarf', 'Time of day' => 'noon'])
+        ->and(ImageCacheEntry::where('scene_signature', 'words:lake sunset')->first()->sceneLabels())->toBe(['Scene' => 'lake sunset']);
+});
+
+it('has a viewer with thumbnails, arrows and every picture in it', function () {
+    $first = cachedPicture($this->maya, 'words:lunch');
+    $second = cachedPicture($this->maya, 'words:lake');
+
+    $page = $this->actingAs($this->admin)->get(route('admin.pictures.contact', $this->maya->id))
+        ->assertSee('data-viewer', false)
+        ->assertSee('Next picture')->assertSee('Previous picture')
+        ->assertSee('View picture 2');
+
+    // Each picture is a thumbnail and also in the viewer's list (where slashes are escaped).
+    $html = preg_replace('#\\\\+/#', '/', $page->getContent());
+    expect(substr_count($html, route('admin.pictures.file', $first->id)))->toBe(2)
+        ->and(substr_count($html, route('admin.pictures.file', $second->id)))->toBe(2);
+});
+
+it('shows the labels on the pictures page too', function () {
+    cachedPicture($this->maya, '{"subject":"lunch","setting":"cafe","action":"","outfit":"","time_of_day":""}');
+
+    Volt::actingAs($this->admin)->test('admin.pictures')->assertSee('Subject:')->assertSee('lunch')->assertDontSee('"subject"');
 });
 
 it('serves a cached picture to admins who manage pictures', function () {
