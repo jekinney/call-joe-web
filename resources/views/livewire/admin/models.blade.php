@@ -101,6 +101,14 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
     {
         Gate::authorize('models.manage');
         $model = Llm::findOrFail($id);
+
+        // A live voice model only talks over a streaming connection, so a text message would always fail.
+        if ($model->purpose === LlmPurpose::Voice) {
+            $this->tests[$id] = ['ok' => true, 'text' => __('Live voice models can\'t be tested with a text. Make a call to try it.')];
+
+            return;
+        }
+
         $started = microtime(true);
 
         try {
@@ -226,7 +234,9 @@ new #[Layout('components.layouts.admin'), Title('AI models')] class extends Comp
                             @endif
                         </div>
                         <div class="flex gap-2">
-                            <flux:button size="sm" wire:click="test({{ $model->id }})">{{ __('Test') }}</flux:button>
+                            @if ($model->purpose !== LlmPurpose::Voice)
+                                <flux:button size="sm" wire:click="test({{ $model->id }})">{{ __('Test') }}</flux:button>
+                            @endif
                             <flux:button size="sm" wire:click="edit({{ $model->id }})">{{ __('Edit') }}</flux:button>
                             <flux:button size="sm" wire:click="toggle({{ $model->id }})">{{ $model->is_active ? __('Turn off') : __('Turn on') }}</flux:button>
                         </div>

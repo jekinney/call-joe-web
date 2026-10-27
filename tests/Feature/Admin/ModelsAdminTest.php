@@ -162,6 +162,14 @@ it('tests a model on its own and shows its answer, or the error', function () {
     modelsPage()->call('test', $haiku->id)->assertSee('Invalid API Key')->assertDontSee('Hello there');
 });
 
+it('does not text a live voice model, which only streams', function () {
+    $live = Llm::where('purpose', 'voice')->first();
+
+    modelsPage()->call('test', $live->id)->assertSee('Live voice models can\'t be tested with a text');
+
+    expect(LlmCall::count())->toBe(0);
+});
+
 it('is linked from the admin sidebar', function () {
     $this->actingAs($this->admin)->get('/admin')->assertSee(route('admin.models'));
 });
