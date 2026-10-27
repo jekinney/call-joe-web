@@ -16,6 +16,7 @@ use App\Models\Message;
 use App\Models\User;
 use App\Models\UserContact;
 use DomainException;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Texting with a contact. A user's text counts against the plan's daily texts; the contact's reply is written in the
@@ -34,6 +35,9 @@ class Texting
     public const MAX_BUBBLES = 4;
 
     public const MAX_LENGTH = 2000;
+
+    /** Most texts one user can send in a minute. */
+    public const BURST_PER_MINUTE = 20;
 
     public function __construct(
         private Entitlements $entitlements,
@@ -59,6 +63,12 @@ class Texting
         if ($body === '' || mb_strlen($body) > self::MAX_LENGTH) {
             throw new DomainException('A text needs 1 to '.self::MAX_LENGTH.' characters.');
         }
+
+        // A burst limit on top of the plan's daily texts, so a script can't run up AI cost in seconds.
+        if (RateLimiter::tooManyAttempts("text:{$user->id}", self::BURST_PER_MINUTE)) {
+            throw new DomainException('Slow down a little. Try again in a minute.');
+        }
+        RateLimiter::hit("text:{$user->id}", 60);
 
         $verdict = $this->moderator->checkUserText($user, $body);
         if ($verdict->blocked) {

@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\AdminPictureController;
 use App\Http\Controllers\BraintreeWebhookController;
+use App\Http\Controllers\DataExportController;
 use App\Http\Controllers\DeclineCallController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ImageController;
@@ -9,15 +11,13 @@ use App\Http\Controllers\VoiceWebhookController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
-Route::get('/', function () {
-    return view('welcome');
-})->name('home');
+Volt::route('/', 'landing')->name('home');
 
 // The voice service's call reports (checked by a secret header; no session or CSRF token).
-Route::post('webhooks/voice', VoiceWebhookController::class)->name('webhooks.voice');
+Route::post('webhooks/voice', VoiceWebhookController::class)->middleware('throttle:120,1')->name('webhooks.voice');
 
 // Braintree's payment webhooks (checked by Braintree's signature; no session or CSRF token).
-Route::match(['get', 'post'], 'webhooks/braintree', BraintreeWebhookController::class)->name('webhooks.braintree');
+Route::match(['get', 'post'], 'webhooks/braintree', BraintreeWebhookController::class)->middleware('throttle:120,1')->name('webhooks.braintree');
 
 // Shown by the service worker when there's no connection (cached when the app is installed).
 Route::view('offline', 'offline')->name('offline');
@@ -58,20 +58,25 @@ Route::prefix('app/settings')->middleware(['auth'])->group(function () {
     Volt::route('password', 'settings.password')->name('settings.password');
     Volt::route('appearance', 'settings.appearance')->name('settings.appearance');
     Volt::route('away', 'settings.away')->name('settings.away');
+    Volt::route('data', 'settings.data')->name('settings.data');
+    Route::get('data/export', DataExportController::class)->middleware('throttle:5,1')->name('settings.data.export');
 });
 
-// Running the service: admins only.
+// Running the service: admins only, and each page needs the permission from the admin's role (App\Enums\Permission).
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'verified', 'can:admin'])->group(function () {
-    Route::view('/', 'admin.home')->name('home');
-    Volt::route('users', 'admin.users.index')->name('users.index');
-    Volt::route('users/{user}', 'admin.users.show')->name('users.show');
-    Volt::route('contacts', 'admin.contacts.index')->name('contacts.index');
-    Volt::route('contacts/new', 'admin.contacts.edit')->name('contacts.create');
-    Volt::route('contacts/{contact}', 'admin.contacts.edit')->name('contacts.edit');
-    Volt::route('prompt-preview', 'admin.prompt-preview')->name('prompt-preview');
-    Volt::route('models', 'admin.models')->name('models');
-    Volt::route('moderation', 'admin.moderation')->name('moderation');
-    Volt::route('pictures', 'admin.pictures')->name('pictures');
+    Volt::route('/', 'admin.home')->middleware('can:overview.view')->name('home');
+    Volt::route('users', 'admin.users.index')->middleware('can:users.view')->name('users.index');
+    Volt::route('users/{user}', 'admin.users.show')->middleware('can:users.view')->name('users.show');
+    Volt::route('contacts', 'admin.contacts.index')->middleware('can:contacts.manage')->name('contacts.index');
+    Volt::route('contacts/new', 'admin.contacts.edit')->middleware('can:contacts.manage')->name('contacts.create');
+    Volt::route('contacts/{contact}', 'admin.contacts.edit')->middleware('can:contacts.manage')->name('contacts.edit');
+    Volt::route('prompt-preview', 'admin.prompt-preview')->middleware('can:prompts.view')->name('prompt-preview');
+    Volt::route('models', 'admin.models')->middleware('can:models.manage')->name('models');
+    Volt::route('moderation', 'admin.moderation')->middleware('can:safety.review')->name('moderation');
+    Volt::route('pictures', 'admin.pictures')->middleware('can:pictures.manage')->name('pictures');
+    Route::get('pictures/file/{image}', AdminPictureController::class)->middleware('can:pictures.manage')->name('pictures.file');
+    Volt::route('pictures/{contactId}', 'admin.pictures.contact')->whereNumber('contactId')->middleware('can:pictures.manage')->name('pictures.contact');
+    Volt::route('roles', 'admin.roles')->middleware('can:roles.manage')->name('roles');
 });
 
 require __DIR__.'/auth.php';

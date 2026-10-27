@@ -1,7 +1,9 @@
 <?php
 
-use App\Livewire\Actions\Logout;
+use App\Exceptions\PaymentException;
+use App\Services\DataRights;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Session;
 use Livewire\Volt\Component;
 
 new class extends Component {
@@ -10,13 +12,26 @@ new class extends Component {
     /**
      * Delete the currently authenticated user.
      */
-    public function deleteUser(Logout $logout): void
+    public function deleteUser(): void
     {
         $this->validate([
             'password' => ['required', 'string', 'current_password'],
         ]);
 
-        tap(Auth::user(), $logout(...))->delete();
+        $user = Auth::user();
+
+        try {
+            app(DataRights::class)->erase($user);
+        } catch (\DomainException|PaymentException $e) {
+            $this->addError('password', $e->getMessage());
+
+            return;
+        }
+
+        // Not Logout: signing out saves a new remember token, which would bring the deleted user back.
+        Auth::guard('web')->forgetUser();
+        Session::invalidate();
+        Session::regenerateToken();
 
         $this->redirect('/', navigate: true);
     }

@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Gate;
 use App\Models\Contact;
 use App\Models\ImageCacheEntry;
 use App\Models\ImageRequest;
@@ -17,6 +18,7 @@ new #[Layout('components.layouts.admin'), Title('Pictures')] class extends Compo
 
     public function purge(int $contactId, PictureCache $cache): void
     {
+        Gate::authorize('pictures.manage');
         $contact = Contact::withTrashed()->findOrFail($contactId);
         $count = $cache->purge($contact);
         $this->purged = trans_choice(':name: :count cached picture forgotten.|:name: :count cached pictures forgotten.', $count, ['name' => $contact->name, 'count' => $count]);
@@ -73,8 +75,14 @@ new #[Layout('components.layouts.admin'), Title('Pictures')] class extends Compo
             <flux:table.rows>
                 @forelse ($top as $row)
                     <flux:table.row :key="$row->cache_key">
-                        <flux:table.cell>{{ $row->contact->name }}</flux:table.cell>
-                        <flux:table.cell class="max-w-md whitespace-normal font-mono text-xs">{{ $row->scene_signature }}</flux:table.cell>
+                        <flux:table.cell><a href="{{ route('admin.pictures.contact', $row->contact_id) }}" class="underline-offset-2 hover:underline" wire:navigate>{{ $row->contact->name }}</a></flux:table.cell>
+                        <flux:table.cell class="max-w-md whitespace-normal">
+                            <div class="flex flex-wrap gap-1" data-scene>
+                                @foreach ($row->sceneLabels() as $label => $value)
+                                    <flux:badge size="sm" color="zinc"><span class="opacity-60">{{ __($label) }}:</span> {{ $value }}</flux:badge>
+                                @endforeach
+                            </div>
+                        </flux:table.cell>
                         <flux:table.cell>{{ $row->variants }}</flux:table.cell>
                         <flux:table.cell>{{ $row->hits }}</flux:table.cell>
                     </flux:table.row>
@@ -93,8 +101,11 @@ new #[Layout('components.layouts.admin'), Title('Pictures')] class extends Compo
         @foreach ($byContact as $row)
             <div class="flex items-center justify-between gap-4 border-b border-zinc-200 pb-2 dark:border-zinc-700" wire:key="c-{{ $row->contact_id }}">
                 <flux:text>{{ $row->contact->name }} · {{ trans_choice(':count picture|:count pictures', $row->pictures, ['count' => $row->pictures]) }} · {{ __(':count reuses', ['count' => $row->hits]) }}</flux:text>
+                <div class="flex gap-2">
+                <flux:button size="sm" :href="route('admin.pictures.contact', $row->contact_id)" wire:navigate>{{ __('View pictures') }}</flux:button>
                 <flux:button size="sm" variant="danger" wire:click="purge({{ $row->contact_id }})"
                     wire:confirm="{{ __('Forget :name\'s cached pictures? New ones are made next time. Pictures already sent stay in their threads.', ['name' => $row->contact->name]) }}">{{ __('Start over') }}</flux:button>
+                </div>
             </div>
         @endforeach
     </section>

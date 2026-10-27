@@ -37,6 +37,8 @@ Then open http://localhost:8090.
 
 **The brain:** two keys run most of it. **Grok** (xAI) writes texts and makes pictures (Grok Imagine, $0.02 each); **Claude** does the careful jobs (memory notes, safety checks, picture scenes). A **Gemini** key adds cheap models for lower-tier contacts, and runs calls. Each model has a provider and a fallback on another provider, and is managed in `/admin/models` (Claude goes through Anthropic's PHP SDK; an "Answer fast" switch turns a model's thinking down).
 
+**Who can do what:** regular users have no role; their tier is their plan (Free, Paid). Admins have a role, a named set of permissions (`App\Enums\Permission`: overview, users, plan changes, suspending, contacts, safety, pictures, AI models, prompt preview, roles). Roles are made in `/admin/roles` and given on a user's page. Support and Content editor start as examples; the Owner role has everything and can't be edited. Owners only come from the command line: `php artisan app:make-admin you@example.com` (add `--role=Support` for another role, or `--revoke` to remove). Nobody can give a permission they lack or change their own role.
+
 **A contact's brain** is the model that writes their texts. Whoever creates the contact chooses it, in `/admin/contacts` (a cheap Gemini for a lower-tier contact, Grok or Claude for a better one, with prices shown), and only an admin can change it: users never see or set it. A contact can't be published without one, and contacts without one use the default (Grok).
 
 **Paid plans** are sold through Braintree: the card form is Braintree's own (card details never touch our server), a subscription puts the user on the plan until the end of the period they paid for (plus 2 days), and Braintree's webhooks (`/webhooks/braintree`) move that date on at each renewal. A failed card or a missed webhook ends on Free, never on free paid service. Add your Braintree sandbox keys and plan id to `.env` (see `.env.example`); until then the plan page says upgrading is coming soon.
@@ -61,6 +63,15 @@ Ports can be changed in `.env` (`APP_PORT`, `FORWARD_DB_PORT`, `VITE_PORT`, and 
 ```
 
 CI (GitHub Actions) runs Pint, Larastan and the full Pest suite against Postgres on every push and pull request, and fails below 95% line coverage. Outside services (LLMs, voice, images, payments) are always faked in tests; tests never touch the network.
+
+## Branches and releases
+
+- `main` is what has been released. `develop` is where work comes together; branch off `develop` (`feature/...`, `fix/...`) and open a pull request back into it.
+- Both branches are protected: changes arrive by pull request, and the `tests` check (Pint, Larastan, the Pest suite with coverage, and the front-end build) must pass first. Merges are squashed.
+- The release number is the `VERSION` file, and a release is the git tag `v` + that number. `0.0.0.1` is the first alpha, tagged `v0.0.0.1`; anything under 1.0 is published as a pre-release.
+- No tags have been made yet; the `release` workflow only runs once the first one is pushed.
+- To release: open a pull request that sets `VERSION` into `develop`, then a pull request from `develop` into `main`, then tag the merge commit on `main` (`git tag v0.0.0.2 && git push origin v0.0.0.2`). The `release` workflow checks the tag matches `VERSION`, runs the tests again and publishes the GitHub release with generated notes.
+- The running version shows at the bottom of the admin sidebar.
 
 ## Roadmap
 

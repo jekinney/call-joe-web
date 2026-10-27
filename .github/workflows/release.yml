@@ -1,0 +1,33 @@
+name: release
+
+# Pushing a tag like v0.0.0.1 publishes a GitHub release, once the tag matches the VERSION file and the tests pass.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  release:
+    needs: tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag must match VERSION
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match VERSION ($version)"; exit 1
+          fi
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Anything before 1.0 is a pre-release (0.0.0.x is alpha).
+          case "${GITHUB_REF_NAME}" in v0.*) flag="--prerelease" ;; *) flag="" ;; esac
+          gh release create "${GITHUB_REF_NAME}" --generate-notes --title "Call Joe ${GITHUB_REF_NAME}" $flag

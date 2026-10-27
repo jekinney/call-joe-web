@@ -17,6 +17,7 @@ use App\Models\UserContact;
 use DomainException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\RateLimiter;
 
 /**
  * Voice calls through our voice service (voice/, Pipecat speaking with Gemini Live). Starting a call makes a one-off
@@ -27,6 +28,9 @@ use Illuminate\Support\Carbon;
  */
 class Calling
 {
+    /** Most calls one user can start in a minute. */
+    public const STARTS_PER_MINUTE = 6;
+
     /** Fewer seconds left than this and a call can't start. */
     public const MIN_SECONDS = 30;
 
@@ -58,6 +62,12 @@ class Calling
             throw new DomainException('That call already ended.');
         }
         $voice = $entry->contact->voice ?: throw new DomainException("{$entry->displayName()} can't take calls yet.");
+
+        // Each call opens a paid session, so starting them is limited too.
+        if (RateLimiter::tooManyAttempts("call:{$user->id}", self::STARTS_PER_MINUTE)) {
+            throw new DomainException('Too many calls in a row. Try again in a minute.');
+        }
+        RateLimiter::hit("call:{$user->id}", 60);
 
         $left = $this->entitlements->remaining($user, Metric::VoiceSeconds);
         if ($left !== null && $left < self::MIN_SECONDS) {

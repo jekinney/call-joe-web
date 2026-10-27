@@ -15,6 +15,9 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // The release this code is: the VERSION file, which always matches the git tag (v0.0.0.1 is VERSION 0.0.0.1).
+    'version' => trim((string) @file_get_contents(base_path('VERSION'))) ?: 'unknown',
+
     // The owner's admin account, made by Database\Seeders\OwnerSeeder. The password lives only in .env.
     'owner' => [
         'name' => env('OWNER_NAME'),
