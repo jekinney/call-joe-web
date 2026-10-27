@@ -6,6 +6,7 @@ use App\Contracts\ImageGenerator;
 use App\Contracts\PaymentGateway;
 use App\Contracts\VoiceProvider;
 use App\Enums\Feature;
+use App\Enums\Permission;
 use App\Http\Middleware\EnsureNotSuspended;
 use App\Http\Middleware\EnsureTermsAccepted;
 use App\Models\User;
@@ -14,6 +15,7 @@ use App\Services\LlmProviders;
 use App\Support\Billing\BraintreeClient;
 use App\Support\Images\XaiImageClient;
 use App\Support\Voice\PipecatClient;
+use Illuminate\Auth\Middleware\Authorize;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
@@ -64,10 +66,15 @@ class AppServiceProvider extends ServiceProvider
         // The /admin area.
         Gate::define('admin', fn (User $user): bool => $user->is_admin);
 
+        // What an admin role allows, one gate per permission: @can('users.view'), can:users.view, Gate::authorize(...).
+        foreach (Permission::cases() as $permission) {
+            Gate::define($permission->value, fn (User $user): bool => $user->hasPermission($permission));
+        }
+
         // A plan feature, in Blade (@can('feature', App\Enums\Feature::Voicemail)) or code.
         Gate::define('feature', fn (User $user, Feature $feature): bool => app(Entitlements::class)->can($user, $feature));
 
         // Livewire's own requests (a button on a page) check these too, not only the first page load.
-        Livewire::addPersistentMiddleware([EnsureNotSuspended::class, EnsureTermsAccepted::class]);
+        Livewire::addPersistentMiddleware([EnsureNotSuspended::class, EnsureTermsAccepted::class, Authorize::class]);
     }
 }

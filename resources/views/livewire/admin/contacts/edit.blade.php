@@ -67,7 +67,7 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
 
     public function save(ContactCatalog $catalog): void
     {
-        Gate::authorize('admin'); // creating a contact, and choosing or changing its brain, is for admins only
+        Gate::authorize('contacts.manage'); // creating a contact, and choosing or changing its brain, takes this permission
         $this->validate();
 
         $data = [
@@ -109,6 +109,7 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
 
     public function publish(ContactCatalog $catalog): void
     {
+        Gate::authorize('contacts.manage');
         try {
             $catalog->publish($this->contact);
         } catch (InvalidArgumentException $e) {
@@ -118,11 +119,13 @@ new #[Layout('components.layouts.admin'), Title('Contact')] class extends Compon
 
     public function unpublish(ContactCatalog $catalog): void
     {
+        Gate::authorize('contacts.manage');
         $catalog->unpublish($this->contact);
     }
 
     public function restore(int $version, ContactCatalog $catalog): void
     {
+        Gate::authorize('contacts.manage');
         $catalog->restore($this->contact, $version, auth()->user());
         $this->persona_md = $this->contact->persona_md;
         $this->looks = $this->contact->looks ?? '';

@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Gate;
 use App\Enums\ModerationCategory;
 use App\Models\ModerationEvent;
 use App\Models\User;
@@ -34,12 +35,15 @@ new #[Layout('components.layouts.admin'), Title('Safety')] class extends Compone
 
     public function review(int $id): void
     {
+        Gate::authorize('safety.review');
         ModerationEvent::whereKey($id)->whereNull('reviewed_at')->update(['reviewed_at' => now(), 'reviewed_by' => auth()->id()]);
     }
 
     /** Suspends the account behind an event, and marks it reviewed. */
     public function suspend(int $id): void
     {
+        Gate::authorize('safety.review');
+        Gate::authorize('users.suspend');
         $event = ModerationEvent::with('user')->findOrFail($id);
         abort_if($event->user->is(auth()->user()), 422, 'You can\'t suspend yourself.');
         $event->user->suspend("Safety: {$event->category->label()} (event #{$event->id})", auth()->user());

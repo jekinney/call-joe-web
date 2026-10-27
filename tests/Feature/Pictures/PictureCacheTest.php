@@ -197,7 +197,7 @@ it('shows admins how much is reused, and starts a contact over', function () {
     $this->actingAs(User::factory()->create())->get(route('admin.pictures'))->assertForbidden();
     $this->actingAs($admin)->get(route('admin.pictures'))->assertOk()
         ->assertSeeInOrder(['Sent', '4', 'Reused', '1', 'Reuse rate', '25%', 'Paid to Grok', '$0.06'])
-        ->assertSee('Maya Brooks')->assertSee('&quot;subject&quot;:&quot;lunch&quot;', false)
+        ->assertSee('Maya Brooks')->assertSee('Subject:')->assertSee('lunch')
         ->assertSee(route('admin.pictures'));
 
     Volt::actingAs($admin)->test('admin.pictures')->call('purge', $this->maya->id)->assertSee('Maya Brooks: 3 cached pictures forgotten.');

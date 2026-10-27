@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -75,7 +77,17 @@ class UserFactory extends Factory
     public function admin(): static
     {
         return $this->state(fn (array $attributes) => [
-            'is_admin' => true,
+            'role_id' => Role::owner()->id,
+        ]);
+    }
+
+    /**
+     * An admin whose role allows only these.
+     */
+    public function allowing(Permission ...$permissions): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::factory()->allowing(...$permissions)->create()->id,
         ]);
     }
 

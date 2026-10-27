@@ -16,6 +16,6 @@ class HomeController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        return redirect()->route($user->is_admin ? 'admin.home' : 'app.home');
+        return redirect()->route($user->is_admin ? $user->adminHome() : 'app.home');
     }
 }

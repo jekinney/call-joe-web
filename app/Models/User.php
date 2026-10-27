@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\Permission;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -20,7 +22,9 @@ use Illuminate\Support\Str;
  * @property string $email
  * @property Carbon|null $email_verified_at
  * @property Carbon|null $date_of_birth
- * @property bool $is_admin
+ * @property int|null $role_id their admin role; none means a regular user (their tier is their plan)
+ * @property-read bool $is_admin they have an admin role
+ * @property-read Role|null $role
  * @property string $timezone
  * @property string $locale
  * @property Carbon|null $last_seen_at
@@ -49,13 +53,13 @@ class User extends Authenticatable implements MustVerifyEmail
      * @var array<string, mixed>
      */
     protected $attributes = [
-        'is_admin' => false,
         'timezone' => 'UTC',
         'locale' => 'en',
     ];
 
     /**
-     * The attributes that are mass assignable. is_admin never is: admins are made with `php artisan app:make-admin`.
+     * The attributes that are mass assignable. role_id never is: owners are made with `php artisan app:make-admin`, other
+     * admins by someone with the roles permission.
      *
      * @var list<string>
      */
@@ -90,7 +94,6 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'date_of_birth' => 'date',
-            'is_admin' => 'boolean',
             'last_seen_at' => 'datetime',
             'plan_expires_at' => 'datetime',
             'away_until' => 'datetime',
@@ -110,6 +113,46 @@ class User extends Authenticatable implements MustVerifyEmail
             ->explode(' ')
             ->map(fn (string $name) => Str::of($name)->substr(0, 1))
             ->implode('');
+    }
+
+    /**
+     * @return BelongsTo<Role, $this>
+     */
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    /**
+     * Whether they may use /admin at all.
+     *
+     * @return Attribute<bool, never>
+     */
+    protected function isAdmin(): Attribute
+    {
+        return Attribute::get(fn (): bool => $this->role_id !== null);
+    }
+
+    public function isOwner(): bool
+    {
+        return $this->role?->is_owner === true;
+    }
+
+    public function hasPermission(Permission $permission): bool
+    {
+        return $this->role?->allows($permission) === true;
+    }
+
+    /** The admin route name to land on: the first page their role opens, else the phone. */
+    public function adminHome(): string
+    {
+        foreach (Permission::cases() as $permission) {
+            if ($permission->page() !== null && $this->hasPermission($permission)) {
+                return $permission->page();
+            }
+        }
+
+        return 'app.home';
     }
 
     /**
